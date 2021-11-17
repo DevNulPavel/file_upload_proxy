@@ -144,7 +144,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
     // Адрес запроса
     let uri = {
         // Имя нашего файлика
-        let file_name = format!("{:x}.txt", uuid::Uuid::new_v4());
+        let file_name = format!("{:x}.txt.gz", uuid::Uuid::new_v4());
         // Адрес
         build_upload_uri(&app.app_arguments.google_bucket_name, &file_name).wrap_err_with_500()?
     };

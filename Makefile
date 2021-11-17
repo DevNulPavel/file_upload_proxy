@@ -39,7 +39,7 @@ TEST_REQUEST_2:
 		-X POST \
 		-H "Content-Type: application/octet-stream" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		--data-binary "@./Cargo.lock" \
+		--data-binary "TEST_TEST_TEST" \
 		"https://island2-web.17btest.com/upload_file"
 
 # Руками лучше не собрать билды локально, а вместо этого
