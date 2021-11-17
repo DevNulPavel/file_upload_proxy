@@ -23,15 +23,15 @@ use hyper::{
 use hyper_rustls::HttpsConnector;
 use std::{convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
 use structopt::StructOpt;
-use tracing::{debug};
+use tracing::{debug, error};
 use tracing_futures::Instrument;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn initialize_logs(arguments: &AppArguments) -> Result<(), eyre::Error> {
+fn initialize_logs() -> Result<(), eyre::Error> {
     use tracing_subscriber::prelude::*;
 
-    let level = match arguments.verbose {
+    /*let level = match arguments.verbose {
         0 => tracing::Level::ERROR,
         1 => tracing::Level::WARN,
         2 => tracing::Level::INFO,
@@ -43,7 +43,10 @@ fn initialize_logs(arguments: &AppArguments) -> Result<(), eyre::Error> {
     };
 
     // Фильтрация на основе настроек
-    let filter = tracing_subscriber::filter::LevelFilter::from_level(level);
+    let filter = tracing_subscriber::filter::LevelFilter::from_level(level);*/
+
+    // Фильтрация на основе окружения
+    let filter = tracing_subscriber::filter::EnvFilter::from_default_env();
 
     // Логи в stdout
     let stdoud_sub = tracing_subscriber::fmt::layer().with_writer(std::io::stdout);
@@ -71,11 +74,8 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
     let addr = SocketAddr::from(([0, 0, 0, 0], app.app_arguments.port));
 
     // Сервис необходим для каждого соединения, поэтому создаем враппер, который будет генерировать наш сервис
-    let make_svc = make_service_fn(move |conn: &AddrStream| {
+    let make_svc = make_service_fn(move |_: &AddrStream| {
         let app = app.clone();
-
-        // Получаем адрес удаленного подключения
-        let remote_addr = conn.remote_addr();
         async move {
             // Создаем сервис из функции с помощью service_fn
             Ok::<_, Infallible>(service_fn(move |req| {
@@ -87,7 +87,6 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
 
                     // Создаем span с идентификатором трассировки
                     let span = tracing::error_span!("request", 
-                        remote_ip = %remote_addr, 
                         trace_id = %trace_id,
                         path = req.uri().path(),
                         method = ?req.method());
@@ -97,7 +96,7 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
                         resp @ Ok(_) => resp,
                         Err(err) => {
                             // Выводим ошибку в консоль
-                            eprintln!("{}", err);
+                            error!("{}", err);
 
                             // Ответ в виде ошибки
                             let resp = response_with_status_desc_and_trace_id(err.status, &err.desc, &trace_id);
@@ -174,7 +173,7 @@ fn main() {
     }
 
     // Логи
-    initialize_logs(&app_arguments).expect("Logs init");
+    initialize_logs().expect("Logs init");
 
     // Клиент для https
     let http_client = build_http_client();

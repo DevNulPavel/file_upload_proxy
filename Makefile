@@ -30,8 +30,12 @@ TEST_REQUEST_1:
 		-d "TEST_FILE_DATA" \
 		"http://localhost:8888/upload_file"
 
+# nginx сейчас настроен для редиректов, поэтому требуется флаг -L
+# При использовании нативной библиотеки нужно проставлять флаг
+# https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 TEST_REQUEST_2:
 	curl \
+		-L \
 		-v \
 		-X POST \
 		-H "Content-Type: application/octet-stream" \

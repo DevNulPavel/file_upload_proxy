@@ -108,6 +108,10 @@ async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadRes
 async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     info!("File uploading");
 
+    // NGINX сейчас может добавлять заголовки при проксировании
+    // X-Real-IP
+    // X-Forwarded-For
+
     // Получаем токен из запроса и проверяем
     let token = req
         .headers()

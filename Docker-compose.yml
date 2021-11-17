@@ -23,7 +23,7 @@ services:
             - ${PWD}/google_service_account.json:/var/google_service_account.json
         environment:
             - RUST_BACKTRACE=full
-            - RUST_LOG=debug
+            - RUST_LOG=file_upload_proxy=trace,warn
             - UPLOADER_API_TOKEN=
             - UPLOADER_GOOGLE_BUCKET_NAME=
             - UPLOADER_GOOGLE_CREDENTIALS_FILE=/var/google_service_account.json

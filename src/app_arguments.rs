@@ -1,6 +1,11 @@
 use structopt::StructOpt;
 use std::path::PathBuf;
 
+
+/// Verbose level
+// #[structopt(short, long, parse(from_occurrences))]
+// pub verbose: u8,
+
 /// App parameters
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
@@ -19,9 +24,5 @@ pub struct AppArguments {
 
     /// Port
     #[structopt(short, long, env = "UPLOADER_PORT")]
-    pub port: u16,
-
-    /// Verbose level
-    #[structopt(short, long, parse(from_occurrences))]
-    pub verbose: u8,
+    pub port: u16
 }
