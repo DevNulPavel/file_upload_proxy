@@ -89,7 +89,8 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
                     let span = tracing::error_span!("request", 
                         remote_ip = %remote_addr, 
                         trace_id = %trace_id,
-                        path = req.uri().path());
+                        path = req.uri().path(),
+                        method = ?req.method());
 
                     // Обработка сервиса
                     match handle_request(&app, req).instrument(span).await {

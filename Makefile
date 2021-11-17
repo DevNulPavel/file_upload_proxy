@@ -21,7 +21,7 @@ RUN_APP:
 		--port 8888 \
 		-vv
 
-TEST_REQUEST:
+TEST_REQUEST_1:
 	curl \
 		-v \
 		-X POST \
@@ -29,6 +29,15 @@ TEST_REQUEST:
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
 		-d "TEST_FILE_DATA" \
 		"http://localhost:8888/upload_file"
+
+TEST_REQUEST_2:
+	curl \
+		-v \
+		-X POST \
+		-H "Content-Type: application/octet-stream" \
+		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
+		-d "TEST_FILE_DATA" \
+		"https://island2-web.17btest.com/upload_file"
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions

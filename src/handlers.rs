@@ -216,7 +216,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
 pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     // debug!("Request processing begin");
 
-    match (req.method(), req.uri().path()) {
+    match (req.method(), req.uri().path().trim_end_matches("/")) {
         // Отладочным образом получаем токен
         /*(&Method::GET, "/token") => {
             info!("Token");
