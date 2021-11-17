@@ -1,6 +1,7 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     types::App,
+    helpers::get_content_length
 };
 use futures::StreamExt;
 use hyper::{
@@ -129,10 +130,11 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         ));
     }
 
-    // Получаем размер данных исходных
-    /*let data_length = get_content_length(req.headers())
-    .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header parsing failed".into())?
-    .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header is missing".into())?;*/
+    // Получаем размер данных исходных чисто для логов
+    let data_length = get_content_length(req.headers())
+        .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header parsing failed".into())?
+        .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header is missing".into())?;
+    debug!("Content-Length: {}", data_length);
 
     // Получаем токен для Google API
     let token = app
