@@ -18,8 +18,7 @@ RUN_APP:
 		--uploader-api-token "test-api-token-aaa-bbb" \
 		--google-credentials-file "env/test_google_service_account.json" \
 		--google-bucket-name "dev_test_public_bucket" \
-		--port 8888 \
-		-vv
+		--port 8888
 
 TEST_REQUEST_1:
 	curl \

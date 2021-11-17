@@ -2,7 +2,7 @@ use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     types::App,
 };
-use futures::StreamExt;
+// use futures::StreamExt;
 use hyper::{
     body::{aggregate, to_bytes, Body as BodyStruct, Buf},
     http::{
@@ -142,22 +142,22 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
     // Адрес запроса
     let uri = {
         // Имя нашего файлика
-        let file_name = format!("{:x}.txt.gz", uuid::Uuid::new_v4());
+        let file_name = format!("{:x}.txt", uuid::Uuid::new_v4());
         // Адрес
         build_upload_uri(&app.app_arguments.google_bucket_name, &file_name).wrap_err_with_500()?
     };
     debug!("Request uri: {}", uri);
 
     // Здесь же можно сделать шифрование данных перед компрессией
-    let body_stream = req
-        .into_body()
-        .map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
-    let reader = tokio_util::io::StreamReader::new(body_stream);
-    let compressor = async_compression::tokio::bufread::GzipEncoder::new(reader);
-    let out_stream = tokio_util::io::ReaderStream::new(compressor);
+    // let body_stream = req
+    //     .into_body()
+    //     .map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
+    // let reader = tokio_util::io::StreamReader::new(body_stream);
+    // let compressor = async_compression::tokio::bufread::GzipEncoder::new(reader);
+    // let out_stream = tokio_util::io::ReaderStream::new(compressor);
 
     // Объект запроса
-    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(out_stream)).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(req.into_body())).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа
