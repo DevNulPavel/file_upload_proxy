@@ -219,6 +219,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
 // #[instrument(level = "error")]
 pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     // debug!("Request processing begin");
+    debug!("Full request info: {:?}", req);
 
     match (req.method(), req.uri().path().trim_end_matches("/")) {
         // Отладочным образом получаем токен
