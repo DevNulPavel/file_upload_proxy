@@ -11,6 +11,10 @@ RUN \
 
 # Сборка рабочего пакета
 FROM debian:11.1
+RUN \
+    apt-get update && \
+    apt-get install -y ca-certificates && \
+    update-ca-certificates
 WORKDIR /file_upload_proxy
 COPY --from=builder \
     /usr/src/file_upload_proxy/target/release/file_upload_proxy \

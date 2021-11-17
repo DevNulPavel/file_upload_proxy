@@ -8,10 +8,13 @@ services:
         restart: unless-stopped
         # env_file:
         #     - env/test_environment_docker.env
+        volumes:
+            - ${PWD}/google_service_account.json:/var/google_service_account.json
         environment:
+            - RUST_BACKTRACE=full
             - UPLOADER_API_TOKEN=
             - UPLOADER_GOOGLE_BUCKET_NAME=
-            - UPLOADER_GOOGLE_CREDENTIALS_FILE=
+            - UPLOADER_GOOGLE_CREDENTIALS_FILE=/var/google_service_account.json
             - UPLOADER_PORT=8888
         ports:
             - 8888:8888
