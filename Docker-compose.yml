@@ -8,11 +8,11 @@ services:
         restart: unless-stopped
         # env_file:
         #     - env/test_environment_docker.env
-        env:
-            UPLOADER_API_TOKEN:
-            UPLOADER_GOOGLE_BUCKET_NAME:
-            UPLOADER_GOOGLE_CREDENTIALS_FILE: 
-            UPLOADER_PORT: 8888
+        environment:
+            - UPLOADER_API_TOKEN=
+            - UPLOADER_GOOGLE_BUCKET_NAME=
+            - UPLOADER_GOOGLE_CREDENTIALS_FILE=
+            - UPLOADER_PORT=8888
         ports:
             - 8888:8888
     # network_mode: host

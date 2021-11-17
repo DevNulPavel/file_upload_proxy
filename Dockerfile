@@ -15,4 +15,4 @@ WORKDIR /file_upload_proxy
 COPY --from=builder \
     /usr/src/file_upload_proxy/target/release/file_upload_proxy \
     file_upload_proxy
-CMD ["./file_upload_proxy -vv"]
+CMD ["./file_upload_proxy", "-vvv"]
