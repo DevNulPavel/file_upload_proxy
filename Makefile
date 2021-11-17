@@ -27,11 +27,12 @@ TEST_REQUEST_1:
 		-H "Content-Type: application/octet-stream" \
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
 		--data-binary "@./Cargo.lock" \
-		"http://localhost:8888/upload_file"
+		"http://localhost:8888/upload_file/"
 
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
+# !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
 TEST_REQUEST_2:
 	curl \
 		-L \
@@ -39,8 +40,9 @@ TEST_REQUEST_2:
 		-X POST \
 		-H "Content-Type: application/octet-stream" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		--data-binary "TEST_TEST_TEST" \
-		"https://island2-web.17btest.com/upload_file"
+		-H "Cache-Control: no-cache" \
+		--data-binary "@./Cargo.lock" \
+		"https://island2-web.17btest.com/upload_file/"
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions
