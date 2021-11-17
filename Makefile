@@ -11,7 +11,7 @@ DECRYPT_TEST_ENV:
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test_google_service_account.json -d env/test_google_service_account.json.asc
 
 RUN_APP:
-	export RUST_LOG=trace && \
+	export RUST_LOG=file_upload_proxy=debug,warn && \
 	cargo clippy && \
 	cargo build --release && \
 	target/release/file_upload_proxy \
@@ -26,7 +26,7 @@ TEST_REQUEST_1:
 		-X POST \
 		-H "Content-Type: application/octet-stream" \
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
-		-d "TEST_FILE_DATA" \
+		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file"
 
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
@@ -39,7 +39,7 @@ TEST_REQUEST_2:
 		-X POST \
 		-H "Content-Type: application/octet-stream" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		-d "TEST_FILE_DATA" \
+		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file"
 
 # Руками лучше не собрать билды локально, а вместо этого

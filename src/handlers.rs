@@ -2,7 +2,7 @@ use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     types::App,
 };
-// use futures::StreamExt;
+use futures::StreamExt;
 use hyper::{
     body::{aggregate, to_bytes, Body as BodyStruct, Buf},
     http::{
@@ -13,10 +13,11 @@ use hyper::{
     },
     Request, Response,
 };
-// use pin_project::pin_project;
+use tokio_util::io::{StreamReader, ReaderStream};
+use async_compression::tokio::bufread::GzipEncoder;
 use serde::Deserialize;
 use serde_json::from_reader as json_from_reader;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -104,7 +105,8 @@ async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadRes
     Ok(info)
 }
 
-#[instrument(level = "error", skip(app, req))]
+// Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
+// #[instrument(level = "error", skip(app, req))]
 async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     info!("File uploading");
 
@@ -149,15 +151,15 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
     debug!("Request uri: {}", uri);
 
     // Здесь же можно сделать шифрование данных перед компрессией
-    // let body_stream = req
-    //     .into_body()
-    //     .map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
-    // let reader = tokio_util::io::StreamReader::new(body_stream);
-    // let compressor = async_compression::tokio::bufread::GzipEncoder::new(reader);
-    // let out_stream = tokio_util::io::ReaderStream::new(compressor);
+    let body_stream = req
+        .into_body()
+        .map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
+    let reader = StreamReader::new(body_stream);
+    let compressor = GzipEncoder::new(reader);
+    let out_stream = ReaderStream::new(compressor);
 
     // Объект запроса
-    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(req.into_body())).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(out_stream)).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа
@@ -200,16 +202,16 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
             Some(text) => {
                 error!("Upload fail result text: {}", text);
                 let resp = format!("Google error response: {}", text);
-                return Err(ErrorWithStatusAndDesc::new_with_status_desc(
+                Err(ErrorWithStatusAndDesc::new_with_status_desc(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     resp.into(),
-                ));
+                ))
             }
             None => {
-                return Err(ErrorWithStatusAndDesc::new_with_status_desc(
+                Err(ErrorWithStatusAndDesc::new_with_status_desc(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Google uploading failed".into(),
-                ));
+                ))
             }
         }
     }
@@ -219,9 +221,9 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
 // #[instrument(level = "error")]
 pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     // debug!("Request processing begin");
-    debug!("Full request info: {:?}", req);
+    info!("Full request info: {:?}", req);
 
-    match (req.method(), req.uri().path().trim_end_matches("/")) {
+    match (req.method(), req.uri().path().trim_end_matches('/')) {
         // Отладочным образом получаем токен
         /*(&Method::GET, "/token") => {
             info!("Token");
@@ -248,10 +250,10 @@ pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Respo
         // Любой другой запрос
         _ => {
             error!("Invalid request");
-            return Err(ErrorWithStatusAndDesc::new_with_status_desc(
+            Err(ErrorWithStatusAndDesc::new_with_status_desc(
                 StatusCode::BAD_REQUEST,
                 "Wrong path".into(),
-            ));
+            ))
         }
     }
 }

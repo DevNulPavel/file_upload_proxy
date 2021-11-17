@@ -81,7 +81,7 @@ impl AuthTokenProvider {
         for _ in 0..5 {
             // Если токен есть и не протух
             if let Some(info) = token_lock.as_ref() {
-                if info.is_expire_soon()? == false {
+                if !info.is_expire_soon()? {
                     return Ok(info.data.access_token.clone());
                 }
             }
@@ -94,6 +94,6 @@ impl AuthTokenProvider {
         // Делаем токен None
         token_lock.take();
 
-        return Err(eyre::eyre!("Invalid tokens received more than 5 times"));
+        Err(eyre::eyre!("Invalid tokens received more than 5 times"))
     }
 }

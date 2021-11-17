@@ -11,13 +11,13 @@ use mime::Mime;
 use rsa::{pkcs8::FromPrivateKey, PaddingScheme, RsaPrivateKey};
 use sha2::Digest;
 use std::str::FromStr;
-use tracing::{debug, instrument};
+use tracing::{trace, instrument};
 
-#[instrument(level = "error", skip(service_acc_data, scopes))]
+#[instrument(level = "trace", skip(service_acc_data, scopes))]
 fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Result<String, eyre::Error>{
     // Header
     /*let jwt_header = r#"{"alg":"RS256","typ":"JWT"}"#; // TODO: Строка константная, закешировать
-    debug!(%jwt_header);
+    trace!(%jwt_header);
     let jwt_header = base64::encode(jwt_header);*/
     let jwt_header = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
 
@@ -34,12 +34,12 @@ fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Resu
         expire_time.timestamp(),
         current_time.timestamp()
     );
-    debug!(%jwt_claims);
+    trace!(%jwt_claims);
     let jwt_claims = base64::encode(jwt_claims);
 
     // Исходная строка для подписи
     let jwt_string_for_signature = format!("{}.{}", jwt_header, jwt_claims);
-    debug!(%jwt_string_for_signature);
+    trace!(%jwt_string_for_signature);
 
     // Приватный ключ читаем
     // Вроде бы как метод шифрования записан в самом ключе, поэтому используем pkcs8 способ чтения закрытого ключа
@@ -55,17 +55,17 @@ fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Resu
 
     // Base64 подписи
     let base_64_signature = base64::encode(signature);
-    debug!(%base_64_signature);
+    trace!(%base_64_signature);
 
     // Результат
     Ok(format!("{}.{}", jwt_string_for_signature, base_64_signature))
 }
 
-#[instrument(level = "error", skip(http_client, service_acc_data, scopes))]
+#[instrument(level = "trace", skip(http_client, service_acc_data, scopes))]
 pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &ServiceAccountData, scopes: &str) -> Result<TokenData, eyre::Error> {
     // TODO: Все обязательно кодируем в base64
     let jwt_result = build_jwt_string(service_acc_data, scopes).wrap_err("JWT string create")?;
-    debug!(%jwt_result);
+    trace!(%jwt_result);
 
     // Адрес запроса
     let uri = Uri::builder()
@@ -74,7 +74,7 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         .path_and_query("/token") // TODO: URL-encode // TODO: Использовать значение из JSON
         .build()
         .wrap_err("Uri build failed")?;
-    debug!(?uri);
+    trace!(?uri);
 
     // Form data - это аналог query строки, но в body
     // Значения разделяются с помощью &, каждый параметр должен быть urlencoded
@@ -83,7 +83,7 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         let assertion = urlencoding::encode(&jwt_result);
         format!("grant_type={}&assertion={}", grand_type, assertion)
     };
-    debug!("Request body: {}", body_data);
+    trace!("Request body: {}", body_data);
 
     // Объект запроса
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
@@ -101,26 +101,26 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.to_string()) // TODO: Optimize
         .body(BodyStruct::from(body_data))
         .wrap_err("Request build error")?;
-    debug!(?request);
+    trace!(?request);
 
     // Объект ответа
     let response = http_client.request(request).await.wrap_err("Http response error")?;
-    debug!(?response);
+    trace!(?response);
 
     // Статус HTTP
     let status = response.status();
 
     // Получаем длину контента
     let content_length: Option<usize> = get_content_length(response.headers()).wrap_err("Content type receive err")?;
-    debug!(?content_length);
+    trace!(?content_length);
 
     // Получаем тип контента
     let content_type_mime: Option<Mime> = get_content_type(response.headers()).wrap_err("Content type receive err")?;
-    debug!(?content_type_mime);
+    trace!(?content_type_mime);
 
     // Данные
     let body_data = to_bytes(response).await.wrap_err("Body data receive")?;
-    debug!(?body_data);
+    trace!(?body_data);
 
     // В зависимости от статуса обрабатыаем иначе
     let token_data = if status.is_success() {
@@ -128,7 +128,7 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         if let Some(content_type_mime) = content_type_mime {
             if content_type_mime.essence_str() == mime::APPLICATION_JSON.essence_str() {
                 let token_data = TokenData::try_parse_from_data(&body_data).wrap_err("Body parsing failed")?;                
-                debug!(?token_data);
+                trace!(?token_data);
                 token_data
             } else {
                 return Err(eyre::eyre!("Wrong conten type: {:?}", content_type_mime));
