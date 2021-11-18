@@ -1,8 +1,9 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
+    helpers::{get_content_length, get_content_type},
     types::App,
-    helpers::get_content_length
 };
+use async_compression::tokio::bufread::GzipEncoder;
 use futures::StreamExt;
 use hyper::{
     body::{aggregate, to_bytes, Body as BodyStruct, Buf},
@@ -14,10 +15,9 @@ use hyper::{
     },
     Request, Response,
 };
-use tokio_util::io::{StreamReader, ReaderStream};
-use async_compression::tokio::bufread::GzipEncoder;
 use serde::Deserialize;
 use serde_json::from_reader as json_from_reader;
+use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::{debug, error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,6 +106,14 @@ async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadRes
     Ok(info)
 }
 
+fn gzip_body(body: BodyStruct) -> BodyStruct {
+    let body_stream = body.map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
+    let reader = StreamReader::new(body_stream);
+    let compressor = GzipEncoder::new(reader);
+    let out_stream = ReaderStream::new(compressor);
+    BodyStruct::wrap_stream(out_stream)
+}
+
 // Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
 // #[instrument(level = "error", skip(app, req))]
 async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
@@ -143,25 +151,26 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         .await
         .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Google cloud token receive failed".into())?;
 
-    // Адрес запроса
-    let uri = {
-        // Имя нашего файлика
-        let file_name = format!("{:x}.txt.gz", uuid::Uuid::new_v4());
-        // Адрес
-        build_upload_uri(&app.app_arguments.google_bucket_name, &file_name).wrap_err_with_500()?
+    // Опциональный тип контента
+    let content_type =
+        get_content_type(req.headers()).wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Content type parsin failed".into())?;
+
+    // В зависимости от типа контента определяем имя файла и body
+    let file_name = match content_type {
+        Some(mime) => match mime.type_() {
+            mime::TEXT => format!("{:x}.txt.gz", uuid::Uuid::new_v4()),
+            mime::JSON => format!("{:x}.json.gz", uuid::Uuid::new_v4()),
+            _ => format!("{:x}.bin.gz", uuid::Uuid::new_v4()),
+        },
+        _ => format!("{:x}.bin.gz", uuid::Uuid::new_v4()),
     };
+
+    // Адрес запроса
+    let uri = build_upload_uri(&app.app_arguments.google_bucket_name, &file_name).wrap_err_with_500()?;
     debug!("Request uri: {}", uri);
 
-    // Здесь же можно сделать шифрование данных перед компрессией
-    let body_stream = req
-        .into_body()
-        .map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
-    let reader = StreamReader::new(body_stream);
-    let compressor = GzipEncoder::new(reader);
-    let out_stream = ReaderStream::new(compressor);
-
     // Объект запроса
-    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(out_stream)).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, gzip_body(req.into_body())).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа
@@ -209,12 +218,10 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
                     resp.into(),
                 ))
             }
-            None => {
-                Err(ErrorWithStatusAndDesc::new_with_status_desc(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Google uploading failed".into(),
-                ))
-            }
+            None => Err(ErrorWithStatusAndDesc::new_with_status_desc(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Google uploading failed".into(),
+            )),
         }
     }
 }

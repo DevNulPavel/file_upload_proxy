@@ -113,6 +113,8 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
     Server::bind(&addr)
         .serve(make_svc)
         /*.with_graceful_shutdown(async {
+            // Docker уже сам умеет делать завершение работы плавное
+
             // https://github.com/hyperium/hyper/issues/1681
             // https://github.com/hyperium/hyper/issues/1668
             // Есть проблема с одновременным использованием клиента и сервера

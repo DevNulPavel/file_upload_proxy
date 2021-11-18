@@ -24,7 +24,7 @@ TEST_REQUEST_1:
 	curl \
 		-v \
 		-X POST \
-		-H "Content-Type: application/octet-stream" \
+		-H "Content-Type: text/plain" \
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/"
@@ -38,7 +38,7 @@ TEST_REQUEST_2:
 		-L \
 		-v \
 		-X POST \
-		-H "Content-Type: application/octet-stream" \
+		-H "Content-Type: text/plain" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
 		-H "Cache-Control: no-cache" \
 		--data-binary "@./Cargo.lock" \
