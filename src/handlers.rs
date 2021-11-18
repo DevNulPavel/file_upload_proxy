@@ -123,6 +123,40 @@ fn gzip_body(body: BodyStruct) -> BodyStruct {
     BodyStruct::wrap_stream(out_stream)
 }
 
+fn build_name_and_body(content_type: Option<mime::Mime>, src_body: BodyStruct) -> (String, BodyStruct) {
+    // Макрос форматирования имени
+    macro_rules! format_name {
+        ($format: literal) => {
+            format!($format, uuid::Uuid::new_v4())
+        };
+    }
+
+    // Формат стандартного имени
+    let default_name = || format_name!("{:x}.bin.gz");
+
+    match content_type {
+        Some(mime) => match mime.type_() {
+            // .txt file
+            mime::TEXT => (format_name!("{:x}.txt.gz"), gzip_body(src_body)),
+            // .json file
+            mime::JSON => (format_name!("{:x}.json.gz"), gzip_body(src_body)),
+            // other
+            mime::APPLICATION => match mime.subtype().as_str() {
+                // zip file уже сжатый
+                "zip" => (format_name!("{:x}.zip"), src_body),
+                // gz file уже сжатый
+                "gz" => (format_name!("{:x}.gz"), src_body),
+                // Прочие
+                _ => (default_name(), gzip_body(src_body)),
+            },
+            // Прочие
+            _ => (default_name(), gzip_body(src_body)),
+        },
+        // Прочие
+        _ => (default_name(), gzip_body(src_body)),
+    }
+}
+
 // Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
 // #[instrument(level = "error", skip(app, req))]
 async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
@@ -165,13 +199,12 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         get_content_type(req.headers()).wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Content type parsin failed".into())?;
 
     // В зависимости от типа контента определяем имя файла и body
-    let file_name = match content_type {
-        Some(mime) => match mime.type_() {
-            mime::TEXT => format!("{:x}.txt.gz", uuid::Uuid::new_v4()),
-            mime::JSON => format!("{:x}.json.gz", uuid::Uuid::new_v4()),
-            _ => format!("{:x}.bin.gz", uuid::Uuid::new_v4()),
-        },
-        _ => format!("{:x}.bin.gz", uuid::Uuid::new_v4()),
+    let (file_name, body) = {
+        // Body исходное
+        let src_body = req.into_body();
+
+        // Имя и body выгрузки
+        build_name_and_body(content_type, src_body)
     };
 
     // Адрес запроса
@@ -179,7 +212,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
     debug!("Request uri: {}", uri);
 
     // Объект запроса
-    let request = build_upload_request(uri, token, gzip_body(req.into_body())).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, body).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа
