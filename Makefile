@@ -17,7 +17,7 @@ RUN_APP:
 	target/release/file_upload_proxy \
 		--uploader-api-token "test-api-token-aaa-bbb" \
 		--google-credentials-file "env/test_google_service_account.json" \
-		--google-bucket-name "dev_test_public_bucket" \
+		--google-bucket-name "dev_test_private_bucket" \
 		--port 8888
 
 TEST_REQUEST_1:

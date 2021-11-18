@@ -65,7 +65,7 @@ fn build_upload_uri(bucket_name: &str, file_name: &str) -> Result<Uri, hyper::ht
             "/upload/storage/v1/b/{}/o?name={}&uploadType=media&fields={}",
             urlencoding::encode(bucket_name),
             urlencoding::encode(file_name),
-            urlencoding::encode("id,md5Hash,mediaLink") // Только нужные поля в ответе сервера, https://cloud.google.com/storage/docs/json_api/v1/objects#resource
+            urlencoding::encode("id,name,bucket,selfLink,md5Hash,mediaLink") // Только нужные поля в ответе сервера, https://cloud.google.com/storage/docs/json_api/v1/objects#resource
         ))
         .build()
 }
@@ -86,11 +86,20 @@ fn build_upload_request(uri: Uri, token: String, body: BodyStruct) -> Result<Req
         .body(body)
 }
 
+// Описание
+// https://cloud.google.com/storage/docs/json_api/v1/objects#resource
 #[derive(Debug, Deserialize)]
 struct UploadResultData {
     id: String,
+    name: String,
+    bucket: String,
+
+    #[serde(rename = "selfLink")]
+    self_link: String,
+
     #[serde(rename = "md5Hash")]
     md5: String,
+
     #[serde(rename = "mediaLink")]
     link: String,
 }
@@ -191,8 +200,11 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         let info = parse_response_body(response).await?;
         debug!("Uploading result: {:?}", info);
 
+        // Ссылка для загрузки c поддержкой проверки пермишенов на скачивание
+        let download_link = format!("https://storage.cloud.google.com/{}/{}", info.bucket, info.name);
+
         // Формируем ответ
-        let json_text = format!(r#"{{"link": "{}"}}"#, info.link);
+        let json_text = format!(r#"{{"link": "{}"}}"#, download_link);
         let response = Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str()) // TODO: Check
