@@ -16,9 +16,10 @@ use tracing::{trace, instrument};
 #[instrument(level = "trace", skip(service_acc_data, scopes))]
 fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Result<String, eyre::Error>{
     // Header
-    /*let jwt_header = r#"{"alg":"RS256","typ":"JWT"}"#; // TODO: Строка константная, закешировать
+    /*let jwt_header = r#"{"alg":"RS256","typ":"JWT"}"#;
     trace!(%jwt_header);
     let jwt_header = base64::encode(jwt_header);*/
+    // Уже вычисленный вариант
     let jwt_header = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
 
     // Claims
@@ -63,7 +64,7 @@ fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Resu
 
 #[instrument(level = "trace", skip(http_client, service_acc_data, scopes))]
 pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &ServiceAccountData, scopes: &str) -> Result<TokenData, eyre::Error> {
-    // TODO: Все обязательно кодируем в base64
+    // Все обязательно кодируем в base64
     let jwt_result = build_jwt_string(service_acc_data, scopes).wrap_err("JWT string create")?;
     trace!(%jwt_result);
 
@@ -71,7 +72,7 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
     let uri = Uri::builder()
         .scheme("https")
         .authority(Authority::from_str("oauth2.googleapis.com").wrap_err("Authority parse error")?)
-        .path_and_query("/token") // TODO: URL-encode // TODO: Использовать значение из JSON
+        .path_and_query("/token")
         .build()
         .wrap_err("Uri build failed")?;
     trace!(?uri);
@@ -79,7 +80,8 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
     // Form data - это аналог query строки, но в body
     // Значения разделяются с помощью &, каждый параметр должен быть urlencoded
     let body_data = {
-        let grand_type = urlencoding::encode("urn:ietf:params:oauth:grant-type:jwt-bearer"); // TODO: Optimize
+        //let grand_type = urlencoding::encode("urn:ietf:params:oauth:grant-type:jwt-bearer");
+        let grand_type = "urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer"; // Уже посчитанный вариант
         let assertion = urlencoding::encode(&jwt_result);
         format!("grant_type={}&assertion={}", grand_type, assertion)
     };
@@ -96,9 +98,9 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         // Может быть дело в регистре?
         // .header(header::HOST, "oauth2.googleapis.com")
         .header(header::CONTENT_LENGTH, body_data.len())
-        .header(header::ACCEPT, mime::APPLICATION_JSON.to_string()) // TODO: Optimize
+        .header(header::ACCEPT, mime::APPLICATION_JSON.essence_str())
         .header(header::USER_AGENT, "hyper")
-        .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.to_string()) // TODO: Optimize
+        .header(header::CONTENT_TYPE, mime::APPLICATION_WWW_FORM_URLENCODED.essence_str())
         .body(BodyStruct::from(body_data))
         .wrap_err("Request build error")?;
     trace!(?request);

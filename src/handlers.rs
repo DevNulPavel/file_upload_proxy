@@ -80,9 +80,9 @@ fn build_upload_request(uri: Uri, token: String, body: BodyStruct) -> Result<Req
         // .header(header::HOST, "oauth2.googleapis.com")
         .header(header::USER_AGENT, "hyper")
         // .header(header::CONTENT_LENGTH, data_length)
-        .header(header::ACCEPT, mime::APPLICATION_JSON.to_string()) // TODO: Optimize
+        .header(header::ACCEPT, mime::APPLICATION_JSON.essence_str())
         .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .header(header::CONTENT_TYPE, mime::OCTET_STREAM.to_string()) // TODO: Optimize
+        .header(header::CONTENT_TYPE, mime::APPLICATION_OCTET_STREAM.essence_str())
         .body(body)
 }
 
@@ -240,7 +240,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         let json_text = format!(r#"{{"link": "{}"}}"#, download_link);
         let response = Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str()) // TODO: Check
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
             .header(header::CONTENT_LENGTH, json_text.as_bytes().len())
             .body(BodyStruct::from(json_text))
             .wrap_err_with_500()?;
@@ -278,26 +278,6 @@ pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Respo
     info!("Full request info: {:?}", req);
 
     match (req.method(), req.uri().path().trim_end_matches('/')) {
-        // Отладочным образом получаем токен
-        /*(&Method::GET, "/token") => {
-            info!("Token");
-
-            let token = app
-                .token_provider
-                .get_token()
-                .await
-                .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Google cloud token receive failed".into())?;
-
-            let json_text = format!(r#"{{"token": "{}"}}"#, token);
-
-            let response = Response::builder()
-                .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str()) // TODO: Check
-                // .header(header::CONTENT_LENGTH, json_text.as_bytes().len())
-                .body(BodyStruct::from(json_text))
-                .wrap_err_with_500()?;
-            Ok(response)
-        }*/
         // Выгружаем данные в Cloud
         (&Method::POST, "/upload_file") => file_upload(app, req).await,
 
@@ -306,7 +286,7 @@ pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Respo
             error!("Invalid request");
             Err(ErrorWithStatusAndDesc::new_with_status_desc(
                 StatusCode::BAD_REQUEST,
-                "Wrong path".into(),
+                "Wrong path or method".into(),
             ))
         }
     }

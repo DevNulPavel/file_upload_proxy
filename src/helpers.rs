@@ -46,7 +46,7 @@ pub fn get_content_type(headers: &HeaderMap) -> Result<Option<Mime>, eyre::Error
     let error_json = format!(r#"{{"description": "{}"}}"#, err_desc);
     Response::builder()
         .status(status)
-        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str()) // TODO: Check
+        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
         .header(header::CONTENT_LENGTH, error_json.as_bytes().len())
         .body(BodyStruct::from(error_json))
         .expect("Static fail response create failed") // Статически создаем ответ, здесь не критично
@@ -56,7 +56,7 @@ pub fn response_with_status_desc_and_trace_id(status: StatusCode, err_desc: &str
     let error_json = format!(r#"{{"error_trace_id": "{}", "desc": "{}"}}"#, trace_id, err_desc);
     Response::builder()
         .status(status)
-        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str()) // TODO: Check
+        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
         .header(header::CONTENT_LENGTH, error_json.as_bytes().len())
         .header(header::CONNECTION, "close")
         .body(BodyStruct::from(error_json))
