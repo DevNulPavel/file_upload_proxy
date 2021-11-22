@@ -87,9 +87,7 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
 
                     // Создаем span с идентификатором трассировки
                     let span = tracing::error_span!("request", 
-                        trace_id = %trace_id,
-                        path = req.uri().path(),
-                        method = ?req.method());
+                        trace_id = %trace_id);
 
                     // Обработка сервиса
                     match handle_request(&app, req).instrument(span).await {
