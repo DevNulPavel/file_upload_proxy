@@ -1,5 +1,8 @@
 use super::{service_account::ServiceAccountData, token_data::TokenData};
-use crate::{types::HttpClient, helpers::{get_content_length, get_content_type}};
+use crate::{
+    helpers::{get_content_length, get_content_type},
+    types::HttpClient,
+};
 use chrono::{Duration, Utc};
 use eyre::WrapErr;
 use hyper::{
@@ -11,10 +14,10 @@ use mime::Mime;
 use rsa::{pkcs8::FromPrivateKey, PaddingScheme, RsaPrivateKey};
 use sha2::Digest;
 use std::str::FromStr;
-use tracing::{trace, instrument};
+use tracing::trace;
 
-#[instrument(level = "trace", skip(service_acc_data, scopes))]
-fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Result<String, eyre::Error>{
+// #[instrument(level = "error", skip(service_acc_data, scopes))]
+fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Result<String, eyre::Error> {
     // Header
     /*let jwt_header = r#"{"alg":"RS256","typ":"JWT"}"#;
     trace!(%jwt_header);
@@ -62,8 +65,12 @@ fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Resu
     Ok(format!("{}.{}", jwt_string_for_signature, base_64_signature))
 }
 
-#[instrument(level = "trace", skip(http_client, service_acc_data, scopes))]
-pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &ServiceAccountData, scopes: &str) -> Result<TokenData, eyre::Error> {
+// #[instrument(level = "error", skip(http_client, service_acc_data, scopes))]
+pub async fn get_token_data(
+    http_client: &HttpClient,
+    service_acc_data: &ServiceAccountData,
+    scopes: &str,
+) -> Result<TokenData, eyre::Error> {
     // Все обязательно кодируем в base64
     let jwt_result = build_jwt_string(service_acc_data, scopes).wrap_err("JWT string create")?;
     trace!(%jwt_result);
@@ -129,7 +136,7 @@ pub async fn get_token_data(http_client: &HttpClient, service_acc_data: &Service
         // Работаем с ответом
         if let Some(content_type_mime) = content_type_mime {
             if content_type_mime.essence_str() == mime::APPLICATION_JSON.essence_str() {
-                let token_data = TokenData::try_parse_from_data(&body_data).wrap_err("Body parsing failed")?;                
+                let token_data = TokenData::try_parse_from_data(&body_data).wrap_err("Body parsing failed")?;
                 trace!(?token_data);
                 token_data
             } else {

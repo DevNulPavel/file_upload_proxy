@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +57,7 @@ impl AuthTokenProvider {
         })
     }
 
-    #[instrument(level = "error", skip(self))]
+    // #[instrument(level = "error", skip(self))]
     async fn receive_token(&self) -> Result<ReceivedTokenInfo, eyre::Error> {
         // Получаем токен на основе данных
         let data = get_token_data(&self.http_client, &self.account_data, self.scopes)
@@ -72,7 +72,7 @@ impl AuthTokenProvider {
         Ok(ReceivedTokenInfo { data, expire_time })
     }
 
-    #[instrument(level = "error", skip(self))]
+    // #[instrument(level = "error", skip(self))]
     pub async fn get_token(&self) -> Result<String, eyre::Error> {
         // Блокируемся, тем самым не даем другим клиентам тоже получать токены
         let mut token_lock = self.token_info.lock().await;
