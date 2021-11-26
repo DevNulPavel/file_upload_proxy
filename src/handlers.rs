@@ -1,6 +1,6 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
-    helpers::{get_content_length, get_content_type},
+    helpers::{get_content_length, get_content_type, get_str_header},
     types::App,
 };
 use async_compression::tokio::bufread::GzipEncoder;
@@ -123,7 +123,7 @@ fn gzip_body(body: BodyStruct) -> BodyStruct {
     BodyStruct::wrap_stream(out_stream)
 }
 
-fn build_name_and_body(content_type: Option<mime::Mime>, src_body: BodyStruct) -> (String, BodyStruct) {
+fn build_name_and_body(req: Request<BodyStruct>) -> Result<(String, BodyStruct), ErrorWithStatusAndDesc> {
     // Макрос форматирования имени
     macro_rules! format_name {
         ($format: literal) => {
@@ -131,30 +131,70 @@ fn build_name_and_body(content_type: Option<mime::Mime>, src_body: BodyStruct) -
         };
     }
 
-    // Формат стандартного имени
-    let default_name = || format_name!("{:x}.bin.gz");
+    // Получаем body и метаданные отдельно
+    let (src_parts, src_body) = req.into_parts();
 
-    match content_type {
-        Some(mime) => match mime.type_() {
-            // .txt file
-            mime::TEXT => (format_name!("{:x}.txt.gz"), gzip_body(src_body)),
-            // .json file
-            mime::JSON => (format_name!("{:x}.json.gz"), gzip_body(src_body)),
-            // other
-            mime::APPLICATION => match mime.subtype().as_str() {
-                // zip file уже сжатый
-                "zip" => (format_name!("{:x}.zip"), src_body),
-                // gz file уже сжатый
-                "gz" => (format_name!("{:x}.gz"), src_body),
+    // Может быть имя у нас уже передано было в запросе в Header?
+    let input_filename = match get_str_header(&src_parts.headers, "X-Filename")
+        .wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Filename parsing failed".into())?
+    {
+        // Передаем как есть
+        val @ Some(_) => val.map(|v| v.to_owned()),
+        None => {
+            // Либо имя у нас передано в query?
+            match src_parts.uri.query() {
+                Some(query_str) => {
+                    #[derive(Debug, Deserialize)]
+                    struct Query {
+                        filename: String,
+                    }
+
+                    serde_qs::from_str::<Query>(query_str).ok().map(|v| v.filename)
+                }
+                None => None,
+            }
+        }
+    };
+
+    // Получаем теперь имя
+    let (name, body) = match input_filename {
+        // Если имя было передано, тогда сами не сжимаем ничего, сохраняем все как есть
+        // Пользователь тут лучше знает
+        Some(name) => (name, src_body),
+        None => {
+            // Опциональный тип контента
+            let content_type = get_content_type(&src_parts.headers)
+                .wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Content type parsing failed".into())?;
+
+            // Формат стандартного имени
+            let default_name_gen = || format_name!("{:x}.bin.gz");
+
+            // Создаем Body новый и генератор имени
+            match content_type {
+                Some(mime) => match mime.type_() {
+                    // .txt file
+                    mime::TEXT => (format_name!("{:x}.txt.gz"), gzip_body(src_body)),
+                    // .json file
+                    mime::JSON => (format_name!("{:x}.json.gz"), gzip_body(src_body)),
+                    // other
+                    mime::APPLICATION => match mime.subtype().as_str() {
+                        // zip file уже сжатый
+                        "zip" => (format_name!("{:x}.zip"), src_body),
+                        // gz file уже сжатый
+                        "gz" => (format_name!("{:x}.gz"), src_body),
+                        // Прочие
+                        _ => (default_name_gen(), gzip_body(src_body)),
+                    },
+                    // Прочие
+                    _ => (default_name_gen(), gzip_body(src_body)),
+                },
                 // Прочие
-                _ => (default_name(), gzip_body(src_body)),
-            },
-            // Прочие
-            _ => (default_name(), gzip_body(src_body)),
-        },
-        // Прочие
-        _ => (default_name(), gzip_body(src_body)),
-    }
+                _ => (default_name_gen(), gzip_body(src_body)),
+            }
+        }
+    };
+
+    Ok((name, body))
 }
 
 // Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
@@ -194,25 +234,15 @@ async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) -> R
         .await
         .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Google cloud token receive failed".into())?;
 
-    // Опциональный тип контента
-    let content_type =
-        get_content_type(req.headers()).wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Content type parsin failed".into())?;
-
-    // В зависимости от типа контента определяем имя файла и body
-    let (file_name, body) = {
-        // Body исходное
-        let src_body = req.into_body();
-
-        // Имя и body выгрузки
-        build_name_and_body(content_type, src_body)
-    };
+    // В зависимости от типа контента определяем имя файла конечно и body конечного
+    let (result_file_name, result_body) = build_name_and_body(req)?;
 
     // Адрес запроса
-    let uri = build_upload_uri(&app.app_arguments.google_bucket_name, &file_name).wrap_err_with_500()?;
+    let uri = build_upload_uri(&app.app_arguments.google_bucket_name, &result_file_name).wrap_err_with_500()?;
     debug!("Request uri: {}", uri);
 
     // Объект запроса
-    let request = build_upload_request(uri, token, body).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, result_body).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа

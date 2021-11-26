@@ -34,6 +34,20 @@ pub fn get_content_type(headers: &HeaderMap) -> Result<Option<Mime>, eyre::Error
     Ok(Some(content_type_mime))
 }
 
+/// Получаем произвольный header и парсим в строку
+pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'a str>, eyre::Error>{
+    let header_val = match headers.get(key) {
+        Some(val) => val,
+        None => return Ok(None),
+    };
+
+    let val = header_val
+        .to_str()
+        .wrap_err("Content type header to string convert failed")?;
+
+    Ok(Some(val))
+}
+
 /*pub fn response_with_status_and_empty_body(status: StatusCode) -> Response<BodyStruct> {
     Response::builder()
         .status(status)
