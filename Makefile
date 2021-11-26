@@ -23,13 +23,21 @@ RUN_APP:
 TEST_REQUEST_1:
 	curl \
 		-v \
+		-X GET \
+		-H "Content-Type: text/plain" \
+		-H "X-Api-Token: test-api-token-aaa-bbb" \
+		"http://localhost:8888/upload_file/"
+
+TEST_REQUEST_2:
+	curl \
+		-v \
 		-X POST \
 		-H "Content-Type: text/plain" \
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/"
 
-TEST_REQUEST_2:
+TEST_REQUEST_3:
 	curl \
 		-v \
 		-X POST \
@@ -39,7 +47,7 @@ TEST_REQUEST_2:
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/"
 
-TEST_REQUEST_3:
+TEST_REQUEST_4:
 	curl \
 		-v \
 		-X POST \
@@ -52,27 +60,13 @@ TEST_REQUEST_3:
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
-TEST_REQUEST_4:
-	curl \
-		-L \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		-H "Cache-Control: no-cache" \
-		--data-binary "@./Cargo.lock" \
-		"https://island2-web.17btest.com/upload_file/"
-
 TEST_REQUEST_5:
 	curl \
 		-L \
 		-v \
-		-X POST \
+		-X GET \
 		-H "Content-Type: text/plain" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		-H "X-Filename: file_$(shell date +%Y-%m-%d_%H-%M-%S).txt" \
-		-H "Cache-Control: no-cache" \
-		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file/"
 
 TEST_REQUEST_6:
@@ -82,7 +76,27 @@ TEST_REQUEST_6:
 		-X POST \
 		-H "Content-Type: text/plain" \
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		-H "Cache-Control: no-cache" \
+		--data-binary "@./Cargo.lock" \
+		"https://island2-web.17btest.com/upload_file/"
+
+TEST_REQUEST_7:
+	curl \
+		-L \
+		-v \
+		-X POST \
+		-H "Content-Type: text/plain" \
+		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
+		-H "X-Filename: file_$(shell date +%Y-%m-%d_%H-%M-%S).txt" \
+		--data-binary "@./Cargo.lock" \
+		"https://island2-web.17btest.com/upload_file/"
+
+TEST_REQUEST_8:
+	curl \
+		-L \
+		-v \
+		-X POST \
+		-H "Content-Type: text/plain" \
+		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
 		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
 

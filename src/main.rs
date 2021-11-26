@@ -89,8 +89,11 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
                     let span = tracing::error_span!("request", 
                         %request_id);
 
+                    let _entered_span = span.enter();
+
                     // Обработка сервиса
-                    match handle_request(&app, req, &request_id).instrument(span).await {
+                    // Для асинхронщины обязательно проставляем текущий span для трассиовки
+                    match handle_request(&app, req, &request_id).in_current_span().await {
                         resp @ Ok(_) => resp,
                         Err(err) => {
                             // Выводим ошибку в консоль
