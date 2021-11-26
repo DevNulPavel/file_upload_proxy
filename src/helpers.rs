@@ -67,7 +67,7 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
 }*/
 
 pub fn response_with_status_desc_and_trace_id(status: StatusCode, err_desc: &str, trace_id: &str) -> Response<BodyStruct> {
-    let error_json = format!(r#"{{"error_trace_id": "{}", "desc": "{}"}}"#, trace_id, err_desc);
+    let error_json = format!(r#"{{"request_id": "{}", "desc": "{}"}}"#, trace_id, err_desc);
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
