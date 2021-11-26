@@ -159,7 +159,7 @@ fn build_name_and_body(content_type: Option<mime::Mime>, src_body: BodyStruct) -
 
 // Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
 // #[instrument(level = "error", skip(app, req))]
-async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
+async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     info!("File uploading");
 
     // NGINX сейчас может добавлять заголовки при проксировании
@@ -237,7 +237,7 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
         let download_link = format!("https://storage.cloud.google.com/{}/{}", info.bucket, info.name);
 
         // Формируем ответ
-        let json_text = format!(r#"{{"link": "{}"}}"#, download_link);
+        let json_text = format!(r#"{{"link": "{}", "request_id": "{}"}}"#, download_link, request_id);
         let response = Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
@@ -273,13 +273,13 @@ async fn file_upload(app: &App, req: Request<BodyStruct>) -> Result<Response<Bod
 
 // Трассировка настраивается уровнем выше
 // #[instrument(level = "error")]
-pub async fn handle_request(app: &App, req: Request<BodyStruct>) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
+pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     // debug!("Request processing begin");
     info!("Full request info: {:?}", req);
 
     match (req.method(), req.uri().path().trim_end_matches('/')) {
         // Выгружаем данные в Cloud
-        (&Method::POST, "/upload_file") => file_upload(app, req).await,
+        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).await,
 
         // Любой другой запрос
         _ => {

@@ -83,21 +83,21 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
 
                 async move {
                     // Создаем идентификатор трассировки для отслеживания ошибок в общих логах
-                    let trace_id = format!("{:x}", uuid::Uuid::new_v4());
+                    let request_id = format!("{:x}", uuid::Uuid::new_v4());
 
                     // Создаем span с идентификатором трассировки
                     let span = tracing::error_span!("request", 
-                        trace_id = %trace_id);
+                        %request_id);
 
                     // Обработка сервиса
-                    match handle_request(&app, req).instrument(span).await {
+                    match handle_request(&app, req, &request_id).instrument(span).await {
                         resp @ Ok(_) => resp,
                         Err(err) => {
                             // Выводим ошибку в консоль
                             error!("{}", err);
 
                             // Ответ в виде ошибки
-                            let resp = response_with_status_desc_and_trace_id(err.status, &err.desc, &trace_id);
+                            let resp = response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id);
 
                             Ok(resp)
                         }
