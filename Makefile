@@ -3,12 +3,13 @@
 
 ENCRYPT_TEST_ENV:
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test_google_service_account.json.asc -e env/test_google_service_account.json
-	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test.env.asc -e env/test.env
+	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_google_service_account.json.asc -e env/prod_google_service_account.json
 
 DECRYPT_TEST_ENV:
-	rm -rf env/test.env
 	rm -rf env/test_google_service_account.json
+	rm -rf env/prod_google_service_account.json
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test_google_service_account.json -d env/test_google_service_account.json.asc
+	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_google_service_account.json -d env/prod_google_service_account.json.asc
 
 RUN_APP:
 	export RUST_LOG=file_upload_proxy=debug,warn && \
@@ -16,8 +17,8 @@ RUN_APP:
 	cargo build --release && \
 	target/release/file_upload_proxy \
 		--uploader-api-token "test-api-token-aaa-bbb" \
-		--google-credentials-file "env/test_google_service_account.json" \
-		--google-bucket-name "dev_test_private_bucket" \
+		--google-credentials-file "env/prod_google_service_account.json" \
+		--google-bucket-name "pi2-prod" \
 		--port 8888
 
 TEST_REQUEST_1:
