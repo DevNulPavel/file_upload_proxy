@@ -6,9 +6,10 @@ use chrono::Duration as ChronoDuration;
 use eyre::{Context, ContextCompat};
 use std::{
     path::Path,
+    sync::Arc,
     time::{Duration as StdDuration, Instant},
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::debug;
 use tracing_log::log::warn;
 
@@ -46,9 +47,10 @@ impl ReceivedTokenInfo {
 #[derive(Debug)]
 pub struct AuthTokenProvider {
     http_client: HttpClient,
-    account_data: ServiceAccountData,
+    account_data: Arc<ServiceAccountData>,
     scopes: &'static str,
     token_info: Mutex<Option<ReceivedTokenInfo>>,
+    background_loading: Mutex<Option<JoinHandle<Result<ReceivedTokenInfo, eyre::Error>>>>,
 }
 
 impl AuthTokenProvider {
@@ -59,10 +61,18 @@ impl AuthTokenProvider {
 
         Ok(AuthTokenProvider {
             http_client,
-            account_data: service_acc_data,
+            account_data: Arc::new(service_acc_data),
             scopes,
             token_info: Mutex::new(None),
+            background_loading: Mutex::new(None),
         })
+    }
+
+    fn spawn_receive_token(&self) -> JoinHandle<Result<ReceivedTokenInfo, eyre::Error>> {
+        let http_client = self.http_client.clone();
+        let account_data = self.account_data.clone();
+        let scopes = self.scopes;
+        tokio::spawn(async move { ReceivedTokenInfo::request(&http_client, account_data.as_ref(), scopes).await })
     }
 
     pub async fn get_token(&self) -> Result<String, eyre::Error> {
@@ -87,17 +97,50 @@ impl AuthTokenProvider {
         for request_iteration in 0..10 {
             // Если токен есть и не протух
             if let Some(info) = token_lock.as_ref() {
-                debug!("Token info: {:?}, life time left: {:?}", info, info.life_duration_left());
+                debug!("Token info: {:?}, life left: {:?}", info, info.life_duration_left());
 
-                // Если осталось уже меньше 10 секунд
-                if info.life_duration_left() < StdDuration::from_secs(30) {
-                    debug!("Token will expire after 30 seconds, request new");
+                // Если осталось уже меньше 10 секунд, то принудительно ждем завершения фоновой подгрузки если она есть
+                // Либо стартуем блокирующую подгрузку
+                if info.life_duration_left() < StdDuration::from_secs(10) {
+                    debug!("Token will expire after 10 seconds");
 
-                    // Иначе запрашиваем токен и обновляем значение локально
-                    let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes).await;
+                    let mut loading_join_lock = self.background_loading.lock().await;
+                    match loading_join_lock.take() {
+                        Some(join_handle) => {
+                            // Ждем результат фоновой подгрузки
+                            let loading_result = join_handle.await.wrap_err("Spawn join failed")?;
+                            debug!("Background loading result received: {:?}", loading_result);
 
-                    // Обновляем значение или идем на новую итерацию при ошибке
-                    update_token_or_warning!(load_res, token_lock, request_iteration);
+                            // Обновляем значение
+                            update_token_or_warning!(loading_result, token_lock, request_iteration);
+                        }
+                        None => {
+                            // Сбрасываем блокировку
+                            drop(loading_join_lock);
+
+                            // Иначе запрашиваем токен и обновляем значение локально
+                            let load_res = ReceivedTokenInfo::request(&self.http_client, self.account_data.as_ref(), self.scopes).await;
+
+                            // Обновляем значение или идем на новую итерацию при ошибке
+                            update_token_or_warning!(load_res, token_lock, request_iteration);
+                        }
+                    }
+                }
+                // Если протухает через 60 секунд, начинаем фоновое получение нового токена
+                else if info.life_duration_left() < StdDuration::from_secs(60) {
+                    debug!("Token will expire after 60 seconds");
+
+                    // Старт фоновой загрузки если нету
+                    {
+                        let mut loading_join_lock = self.background_loading.lock().await;
+                        if loading_join_lock.is_none() {
+                            debug!("Start background loading");
+                            loading_join_lock.replace(self.spawn_receive_token());
+                        }
+                    }
+
+                    // Возвращаем старое значение пока что, оно вполне валидное
+                    return Ok(info.data.access_token.clone());
                 }
                 // Пока возвращаем старый статус
                 else {
@@ -105,7 +148,7 @@ impl AuthTokenProvider {
                 }
             } else {
                 // Иначе запрашиваем токен и обновляем значение локально
-                let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes).await;
+                let load_res = ReceivedTokenInfo::request(&self.http_client, self.account_data.as_ref(), self.scopes).await;
                 // Обновляем значение или идем на новую итерацию при ошибке
                 update_token_or_warning!(load_res, token_lock, request_iteration);
             }
