@@ -12,7 +12,7 @@ DECRYPT_TEST_ENV:
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_google_service_account.json -d env/prod_google_service_account.json.asc
 
 RUN_APP:
-	export RUST_LOG=file_upload_proxy=debug,warn && \
+	export RUST_LOG=file_upload_proxy=trace,warn && \
 	cargo clippy && \
 	cargo build --release && \
 	target/release/file_upload_proxy \
@@ -105,3 +105,7 @@ TEST_REQUEST_8:
 # запускать сборку на github через actions
 BUILD_DOCKER_IMAGE:
 	docker buildx build --platform linux/amd64,linux/arm64 .
+
+
+TEST:
+	source Dockerfile

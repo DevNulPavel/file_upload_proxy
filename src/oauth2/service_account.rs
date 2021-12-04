@@ -3,7 +3,7 @@ use std::{path::Path, io::BufReader, fs::File};
 use serde_json::from_reader;
 use eyre::WrapErr;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServiceAccountData{
     #[serde(rename = "type")]
     pub acc_type: String,   // TODO: Enum

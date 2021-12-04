@@ -17,7 +17,7 @@ use std::str::FromStr;
 use tracing::trace;
 
 // #[instrument(level = "error", skip(service_acc_data, scopes))]
-fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Result<String, eyre::Error> {
+fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str, duration: Duration) -> Result<String, eyre::Error> {
     // Header
     /*let jwt_header = r#"{"alg":"RS256","typ":"JWT"}"#;
     trace!(%jwt_header);
@@ -28,7 +28,7 @@ fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str) -> Resu
     // Claims
     let current_time = Utc::now();
     let expire_time = current_time
-        .checked_add_signed(Duration::minutes(60))
+        .checked_add_signed(duration)
         .ok_or_else(|| eyre::eyre!("Expire time calc err"))?;
     let jwt_claims = format!(
         r###"{{"iss":"{}","scope":"{}","aud":"{}","exp":{},"iat":{}}}"###,
@@ -70,9 +70,10 @@ pub async fn get_token_data(
     http_client: &HttpClient,
     service_acc_data: &ServiceAccountData,
     scopes: &str,
+    duration: Duration
 ) -> Result<TokenData, eyre::Error> {
     // Все обязательно кодируем в base64
-    let jwt_result = build_jwt_string(service_acc_data, scopes).wrap_err("JWT string create")?;
+    let jwt_result = build_jwt_string(service_acc_data, scopes, duration).wrap_err("JWT string create")?;
     trace!(%jwt_result);
 
     // Адрес запроса
