@@ -90,18 +90,18 @@ fn build_upload_request(uri: Uri, token: String, body: BodyStruct) -> Result<Req
 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource
 #[derive(Debug, Deserialize)]
 struct UploadResultData {
-    id: String,
+    // id: String,
     name: String,
     bucket: String,
 
-    #[serde(rename = "selfLink")]
-    self_link: String,
+    // #[serde(rename = "selfLink")]
+    // self_link: String,
 
-    #[serde(rename = "md5Hash")]
-    md5: String,
+    // #[serde(rename = "md5Hash")]
+    // md5: String,
 
-    #[serde(rename = "mediaLink")]
-    link: String,
+    // #[serde(rename = "mediaLink")]
+    // link: String,
 }
 
 async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadResultData, ErrorWithStatusAndDesc> {
