@@ -14,7 +14,7 @@ use mime::Mime;
 use rsa::{pkcs8::FromPrivateKey, PaddingScheme, RsaPrivateKey};
 use sha2::Digest;
 use std::str::FromStr;
-use tracing::trace;
+use tracing::{instrument, trace, warn, Instrument};
 
 // #[instrument(level = "error", skip(service_acc_data, scopes))]
 fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str, duration: Duration) -> Result<String, eyre::Error> {
@@ -70,7 +70,7 @@ pub async fn get_token_data(
     http_client: &HttpClient,
     service_acc_data: &ServiceAccountData,
     scopes: &str,
-    duration: Duration
+    duration: Duration,
 ) -> Result<TokenData, eyre::Error> {
     // Все обязательно кодируем в base64
     let jwt_result = build_jwt_string(service_acc_data, scopes, duration).wrap_err("JWT string create")?;
@@ -113,6 +113,26 @@ pub async fn get_token_data(
         .body(BodyStruct::from(body_data))
         .wrap_err("Request build error")?;
     trace!(?request);
+
+    /*let response = backoff::future::retry(backoff::ExponentialBackoff::default(), || {
+        async move {
+            match http_client.request(request).await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        Ok(response)
+                    } else {
+                        warn!("Token request failed with status: {}", response.status());
+                        Err(backoff::Error::Transient(eyre::eyre!("Invalid status")))
+                    }
+                }
+                Err(err) => Err(backoff::Error::Permanent(eyre::Error::new(err))),
+            }
+        }
+        .in_current_span()
+    })
+    .await
+    .wrap_err("Http response error")?;
+    trace!(?response);*/
 
     // Объект ответа
     let response = http_client.request(request).await.wrap_err("Http response error")?;
