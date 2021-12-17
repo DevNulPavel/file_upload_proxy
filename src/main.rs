@@ -54,6 +54,10 @@ fn initialize_logs() -> Result<(), eyre::Error> {
     // Error layer для формирования слоя ошибки
     let error_layer = tracing_error::ErrorLayer::default();
 
+    // spawn the console server in the background,
+    // returning a `Layer`:
+    // let console_layer = console_subscriber::spawn();
+
     // Суммарный обработчик
     let full_subscriber = tracing_subscriber::registry().with(filter).with(error_layer).with(stdoud_sub);
 

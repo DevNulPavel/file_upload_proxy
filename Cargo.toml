@@ -15,7 +15,8 @@ tracing-futures = "0.2"
 tracing-log = "0.1"
 tracing-error = "0.1"
 structopt = "0.3"
-tokio = {version = "1.13", features = ["full"]} # TODO: Оставить нужное только
+tokio = {version = "1.13", features = ["full", "tracing"]} # TODO: Оставить нужное только
+# console-subscriber = "0.1"
 hyper = {version = "0.14", features = ["full"]} # TODO: Оставить нужное только
 hyper-rustls = "0.22"
 futures = "0.3"

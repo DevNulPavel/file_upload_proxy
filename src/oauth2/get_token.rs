@@ -14,7 +14,7 @@ use mime::Mime;
 use rsa::{pkcs8::FromPrivateKey, PaddingScheme, RsaPrivateKey};
 use sha2::Digest;
 use std::str::FromStr;
-use tracing::{instrument, trace, warn, Instrument};
+use tracing::trace;
 
 // #[instrument(level = "error", skip(service_acc_data, scopes))]
 fn build_jwt_string(service_acc_data: &ServiceAccountData, scopes: &str, duration: Duration) -> Result<String, eyre::Error> {
