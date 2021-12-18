@@ -10,13 +10,13 @@ edition = "2021"
 eyre = "0.6"
 color-eyre = "0.5"
 tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}
 tracing-futures = "0.2"
 tracing-log = "0.1"
-tracing-error = "0.1"
+tracing-error = "0.2"
 structopt = "0.3"
 tokio = {version = "1.13", features = ["full", "tracing"]} # TODO: Оставить нужное только
-# console-subscriber = "0.1"
+console-subscriber = "0.1" # Специальный слой для tracing для возможности отладки через tokio-console
 hyper = {version = "0.14", features = ["full"]} # TODO: Оставить нужное только
 hyper-rustls = "0.22"
 futures = "0.3"

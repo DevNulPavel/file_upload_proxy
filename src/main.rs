@@ -41,7 +41,6 @@ fn initialize_logs() -> Result<(), eyre::Error> {
             panic!("Verbose level must be in [0, 4] range");
         }
     };
-
     // Фильтрация на основе настроек
     let filter = tracing_subscriber::filter::LevelFilter::from_level(level);*/
 
@@ -51,15 +50,19 @@ fn initialize_logs() -> Result<(), eyre::Error> {
     // Логи в stdout
     let stdoud_sub = tracing_subscriber::fmt::layer().with_writer(std::io::stdout);
 
-    // Error layer для формирования слоя ошибки
+    // Error layer для формирования слоя ошибки по запросу
     let error_layer = tracing_error::ErrorLayer::default();
 
-    // spawn the console server in the background,
-    // returning a `Layer`:
-    // let console_layer = console_subscriber::spawn();
+    // Специальный слой для отладочной консоли tokio
+    // Используем стандартные настройки для фильтрации из переменной RUST_LOG
+    let console_layer = console_subscriber::ConsoleLayer::builder().with_default_env().spawn();
 
     // Суммарный обработчик
-    let full_subscriber = tracing_subscriber::registry().with(filter).with(error_layer).with(stdoud_sub);
+    let full_subscriber = tracing_subscriber::registry()
+        .with(console_layer)
+        .with(filter)
+        .with(error_layer)
+        .with(stdoud_sub);
 
     // Враппер для библиотеки log
     tracing_log::LogTracer::init().wrap_err("Log wrapper create failed")?;
@@ -119,7 +122,6 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
         .serve(make_svc)
         /*.with_graceful_shutdown(async {
             // Docker уже сам умеет делать завершение работы плавное
-
             // https://github.com/hyperium/hyper/issues/1681
             // https://github.com/hyperium/hyper/issues/1668
             // Есть проблема с одновременным использованием клиента и сервера

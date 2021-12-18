@@ -21,6 +21,10 @@ RUN_APP:
 		--google-bucket-name "pi2-prod" \
 		--port 8888
 
+RUN_TOKIO_CONSOLE:
+	# cargo install tokio-console
+	tokio-console
+
 TEST_REQUEST_1:
 	curl \
 		-v \
@@ -105,7 +109,6 @@ TEST_REQUEST_8:
 # запускать сборку на github через actions
 BUILD_DOCKER_IMAGE:
 	docker buildx build --platform linux/amd64,linux/arm64 .
-
 
 TEST:
 	source Dockerfile
