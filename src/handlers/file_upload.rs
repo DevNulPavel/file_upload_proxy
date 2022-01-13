@@ -93,7 +93,6 @@ struct UploadResultData {
     // id: String,
     name: String,
     bucket: String,
-
     // #[serde(rename = "selfLink")]
     // self_link: String,
 
@@ -199,7 +198,7 @@ fn build_name_and_body(req: Request<BodyStruct>) -> Result<(String, BodyStruct),
 
 // Пока достаточно самого верхнего контекста трассировки чтобы не захламлять вывод логов
 // #[instrument(level = "error", skip(app, req))]
-async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
+pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
     info!("File uploading");
 
     // NGINX сейчас может добавлять заголовки при проксировании
@@ -297,27 +296,6 @@ async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) -> R
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Google uploading failed".into(),
             )),
-        }
-    }
-}
-
-// Трассировка настраивается уровнем выше
-// #[instrument(level = "error")]
-pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
-    // debug!("Request processing begin");
-    info!("Full request info: {:?}", req);
-
-    match (req.method(), req.uri().path().trim_end_matches('/')) {
-        // Выгружаем данные в Cloud
-        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).await,
-
-        // Любой другой запрос
-        _ => {
-            error!("Invalid request");
-            Err(ErrorWithStatusAndDesc::new_with_status_desc(
-                StatusCode::BAD_REQUEST,
-                "Wrong path or method".into(),
-            ))
         }
     }
 }

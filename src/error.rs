@@ -7,6 +7,9 @@ pub trait WrapErrorWithStatusAndDesc<T> {
     /// Оборачиваем ошибку в 500й статус
     fn wrap_err_with_500(self) -> Result<T, ErrorWithStatusAndDesc>;
 
+    /// Оборачиваем ошибку в 500й статус и добавляем описание
+    fn wrap_err_with_500_desc(self, desc: Cow<'static, str>) -> Result<T, ErrorWithStatusAndDesc>;
+
     /// Оборачиваем ошибку в конкретный статус
     fn wrap_err_with_status(self, status: StatusCode) -> Result<T, ErrorWithStatusAndDesc>;
 
@@ -68,6 +71,12 @@ where
             .map_err(|e| ErrorWithStatusAndDesc::from_error_with_status_desc(e, StatusCode::INTERNAL_SERVER_ERROR, "Internal error".into()))
     }
 
+    /// Оборачиваем ошибку в 500й статус и добавляем описание
+    fn wrap_err_with_500_desc(self, desc: Cow<'static, str>) -> Result<T, ErrorWithStatusAndDesc>{
+        self.map_err(eyre::Error::from)
+            .map_err(|e| ErrorWithStatusAndDesc::from_error_with_status_desc(e, StatusCode::INTERNAL_SERVER_ERROR, desc))
+    }
+
     /// Оборачиваем ошибку в конкретный статус
     fn wrap_err_with_status(self, status: StatusCode) -> Result<T, ErrorWithStatusAndDesc> {
         self.map_err(eyre::Error::from)
@@ -100,6 +109,12 @@ impl<T> WrapErrorWithStatusAndDesc<T> for Option<T> {
         self.ok_or_else(|| eyre::eyre!("Option is None"))
             .map_err(|e| ErrorWithStatusAndDesc::from_error_with_status_desc(e, StatusCode::INTERNAL_SERVER_ERROR, "Internal error".into()))
     }
+
+    /// Оборачиваем ошибку в 500й статус и добавляем описание
+    fn wrap_err_with_500_desc(self, desc: Cow<'static, str>) -> Result<T, ErrorWithStatusAndDesc>{
+        self.ok_or_else(|| eyre::eyre!("Option is None"))
+            .map_err(|e| ErrorWithStatusAndDesc::from_error_with_status_desc(e, StatusCode::INTERNAL_SERVER_ERROR, desc))
+    }    
 
     /// Оборачиваем ошибку в конкретный статус
     fn wrap_err_with_status(self, status: StatusCode) -> Result<T, ErrorWithStatusAndDesc> {

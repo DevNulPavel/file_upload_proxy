@@ -25,7 +25,7 @@ RUN_TOKIO_CONSOLE:
 	# cargo install tokio-console
 	tokio-console
 
-TEST_REQUEST_1:
+TEST_REQUEST_LOCAL_1:
 	curl \
 		-v \
 		-X GET \
@@ -33,7 +33,7 @@ TEST_REQUEST_1:
 		-H "X-Api-Token: test-api-token-aaa-bbb" \
 		"http://localhost:8888/upload_file/"
 
-TEST_REQUEST_2:
+TEST_REQUEST_LOCAL_2:
 	curl \
 		-v \
 		-X POST \
@@ -42,7 +42,7 @@ TEST_REQUEST_2:
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/"
 
-TEST_REQUEST_3:
+TEST_REQUEST_LOCAL_3:
 	curl \
 		-v \
 		-X POST \
@@ -52,7 +52,7 @@ TEST_REQUEST_3:
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/"
 
-TEST_REQUEST_4:
+TEST_REQUEST_LOCAL_4:
 	curl \
 		-v \
 		-X POST \
@@ -61,11 +61,23 @@ TEST_REQUEST_4:
 		--data-binary "@./Cargo.lock" \
 		"http://localhost:8888/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
 
+TEST_REQUEST_LOCAL_5:
+	curl \
+		-v \
+		-X GET \
+		"http://localhost:8888/prometheus_metrics/"
+
+TEST_REQUEST_LOCAL_6:
+	curl \
+		-v \
+		-X GET \
+		"http://localhost:8888/health/"
+
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
-TEST_REQUEST_5:
+TEST_REQUEST_REMOTE_1:
 	curl \
 		-L \
 		-v \
@@ -74,7 +86,7 @@ TEST_REQUEST_5:
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
 		"https://island2-web.17btest.com/upload_file/"
 
-TEST_REQUEST_6:
+TEST_REQUEST_REMOTE_2:
 	curl \
 		-L \
 		-v \
@@ -84,7 +96,7 @@ TEST_REQUEST_6:
 		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file/"
 
-TEST_REQUEST_7:
+TEST_REQUEST_REMOTE_3:
 	curl \
 		-L \
 		-v \
@@ -95,7 +107,7 @@ TEST_REQUEST_7:
 		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file/"
 
-TEST_REQUEST_8:
+TEST_REQUEST_REMOTE_4:
 	curl \
 		-L \
 		-v \
@@ -104,6 +116,18 @@ TEST_REQUEST_8:
 		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
 		--data-binary "@./Cargo.lock" \
 		"https://island2-web.17btest.com/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
+
+TEST_REQUEST_REMOTE_5:
+	curl \
+		-v \
+		-X GET \
+		"https://island2-web.17btest.com/prometheus_metrics/"
+
+TEST_REQUEST_REMOTE_6:
+	curl \
+		-v \
+		-X GET \
+		"https://island2-web.17btest.com/health/"
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions

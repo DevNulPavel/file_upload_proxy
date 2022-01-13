@@ -4,13 +4,15 @@ mod error;
 mod handlers;
 mod helpers;
 mod oauth2;
+mod prometheus;
 mod types;
 
-use crate::{
+use self::{
     app_arguments::AppArguments,
     auth_token_provider::AuthTokenProvider,
     handlers::handle_request,
     helpers::response_with_status_desc_and_trace_id,
+    prometheus::{count_request, count_response_status},
     types::{App, HttpClient},
 };
 use eyre::WrapErr;
@@ -86,6 +88,9 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
         async move {
             // Создаем сервис из функции с помощью service_fn
             Ok::<_, Infallible>(service_fn(move |req| {
+                // Увеличиваем общий счетчик запросов
+                count_request();
+
                 let app = app.clone();
 
                 async move {
@@ -95,23 +100,31 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
                     // Создаем span с идентификатором трассировки
                     let span = tracing::error_span!("request", 
                         %request_id);
-
                     let _entered_span = span.enter();
+
+                    // Так как владение запросом передается дальше, тогда просто создадим тут копии
+                    // TODO: Ножно было бы в обработчике запроса развернуть запрос на содержимое и вернуть назад мета-информацию
+                    // Но пока обойдемся копией данных
+                    let method = req.method().to_owned();
+                    let path = req.uri().path().trim_end_matches('/').to_owned();
 
                     // Обработка сервиса
                     // Для асинхронщины обязательно проставляем текущий span для трассиовки
-                    match handle_request(&app, req, &request_id).in_current_span().await {
-                        resp @ Ok(_) => resp,
+                    let response = match handle_request(&app, req, &request_id).in_current_span().await {
+                        Ok(resp) => resp,
                         Err(err) => {
                             // Выводим ошибку в консоль
                             error!("{}", err);
 
                             // Ответ в виде ошибки
-                            let resp = response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id);
-
-                            Ok(resp)
+                            response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id)
                         }
-                    }
+                    };
+
+                    // Делаем подсчет значений статусов и запросов
+                    count_response_status(&path, &method, &response.status());
+
+                    Ok::<_, Infallible>(response)
                 }
             }))
         }
