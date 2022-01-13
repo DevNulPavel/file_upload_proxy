@@ -1,10 +1,10 @@
-# Шаблон Docker-Compose для запуска на сервере
+# Шаблон Docker-Compose для запуска локально окружения для тестирования
 
-# Команды для полного перезапуска на сервере
+# Команды для полного перезапуска
 # docker-compose stop && \
 # docker-compose rm -f && \
 # docker-compose pull && \
-# docker-compose up -d
+# docker-compose up
 
 # Команда для вывода всех логов контейнера
 # https://docs.docker.com/compose/reference/logs/
@@ -17,22 +17,6 @@
 
 version: "3.3"
 services:
-    file_upload_proxy:
-        image: devnul/file_upload_proxy:latest
-        container_name: file_upload_proxy
-        restart: unless-stopped
-        volumes:
-            - ${PWD}/google_service_account.json:/var/google_service_account.json
-        environment:
-            - RUST_BACKTRACE=full
-            - RUST_LOG=file_upload_proxy=trace,warn
-            - UPLOADER_API_TOKEN=?????????????????
-            - UPLOADER_GOOGLE_BUCKET_NAME=?????????????????
-            - UPLOADER_GOOGLE_CREDENTIALS_FILE=/var/google_service_account.json
-            - UPLOADER_PORT=8888
-        ports:
-            - 8888:8888
-
     prometheus:
         image: prom/prometheus:latest
         container_name: prometheus
@@ -44,7 +28,10 @@ services:
         command:
             - '--config.file=/etc/prometheus/prometheus.yml'
             - '--web.external-url=http://localhost:9090'
-
+        extra_hosts:
+            # - host.docker.internal:host-gateway
+            # - docker.for.win.host.internal:host-gateway
+            - docker.for.mac.host.internal:host-gateway
     grafana:
         image: grafana/grafana:latest
         container_name: grafana
@@ -57,7 +44,8 @@ services:
         environment:
             GF_SECURITY_ADMIN_USER: admin
             GF_SECURITY_ADMIN_PASSWORD: admin
-
+        depends_on:
+            - prometheus
     alertmanager:
         image: prom/alertmanager:latest
         container_name: alertmanager
@@ -66,18 +54,20 @@ services:
         volumes:
             - ${PWD}/monitoring_configs/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
         command:
-        - '--config.file=/etc/alertmanager/alertmanager.yml'
-        - '--web.external-url=http://localhost:9093'
-
-    cadvisor:
-        image: gcr.io/cadvisor/cadvisor:latest
-        container_name: cadvisor
-        restart: always
-        ports:
-            - '8080:8080'
-        volumes:
-            - /:/rootfs:ro
-            - /var/run:/var/run:rw
-            - /sys:/sys:ro
-            - /var/lib/docker/:/var/lib/docker:ro                    
-    # network_mode: host
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--web.external-url=http://localhost:9093'
+        depends_on:
+            - prometheus
+    # cadvisor:
+    #     image: gcr.io/cadvisor/cadvisor:latest
+    #     container_name: cadvisor
+    #     restart: always
+    #     ports:
+    #         - '8080:8080'
+    #     volumes:
+    #         - /:/rootfs:ro
+    #         - /var/run:/var/run:rw
+    #         - /sys:/sys:ro
+    #         - /var/lib/docker/:/var/lib/docker:ro
+    #     depends_on:
+    #         - prometheus
