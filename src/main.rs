@@ -16,6 +16,7 @@ use self::{
     types::{App, HttpClient},
 };
 use eyre::WrapErr;
+use handlers::RequestProcessResult;
 use hyper::{
     body::Body as BodyStruct,
     server::{conn::AddrStream, Server},
@@ -110,19 +111,27 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
 
                     // Обработка сервиса
                     // Для асинхронщины обязательно проставляем текущий span для трассиовки
-                    let response = match handle_request(&app, req, &request_id).in_current_span().await {
-                        Ok(resp) => resp,
+                    let RequestProcessResult {
+                        response,
+                        allow_metric_count,
+                    } = match handle_request(&app, req, &request_id).in_current_span().await {
+                        Ok(response) => response,
                         Err(err) => {
                             // Выводим ошибку в консоль
                             error!("{}", err);
 
                             // Ответ в виде ошибки
-                            response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id)
+                            RequestProcessResult {
+                                response: response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id),
+                                allow_metric_count: true,
+                            }
                         }
                     };
 
-                    // Делаем подсчет значений статусов и запросов
-                    count_response_status(&path, &method, &response.status());
+                    // Делаем подсчет значений статусов и запросов, но кроме получаемых метрик
+                    if allow_metric_count {
+                        count_response_status(&path, &method, &response.status());
+                    }
 
                     Ok::<_, Infallible>(response)
                 }

@@ -13,9 +13,20 @@ use hyper::{
 };
 use tracing::{error, info};
 
+// Специальная обертка чтобы сообщить на уровень выше нужно ли подсчитывать данный запрос
+pub struct RequestProcessResult{
+    pub response: Response<BodyStruct>,
+    pub allow_metric_count: bool
+}
+impl From<Response<BodyStruct>> for RequestProcessResult {
+    fn from(res: Response<BodyStruct>) -> Self {
+        RequestProcessResult { response: res, allow_metric_count: true }
+    }
+}
+
 // Трассировка настраивается уровнем выше
 // #[instrument(level = "error")]
-pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
+pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &str) -> Result<RequestProcessResult, ErrorWithStatusAndDesc> {
     // debug!("Request processing begin");
     info!("Full request info: {:?}", req);
 
@@ -23,7 +34,7 @@ pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &st
     let path = req.uri().path().trim_end_matches('/');
     match (method, path) {
         // Выгружаем данные в Cloud
-        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).await,
+        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).await.map(Into::into),
 
         // Работоспособность сервиса
         (&Method::GET, "/health") => {
@@ -32,11 +43,14 @@ pub async fn handle_request(app: &App, req: Request<BodyStruct>, request_id: &st
                 .status(StatusCode::OK)
                 .body(BodyStruct::empty())
                 .wrap_err_with_500()?;
-            Ok(resp)
+            Ok(resp.into())
         }
 
         // Запрашиваем метрики для Prometheus
-        (&Method::GET, "/prometheus_metrics") => prometheus_metrics().await,
+        (&Method::GET, "/prometheus_metrics") => prometheus_metrics().await.map(|res| RequestProcessResult{ 
+            response: res,
+            allow_metric_count: false
+        }),
 
         // Любой другой запрос
         _ => {
