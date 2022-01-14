@@ -1,6 +1,7 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     helpers::{get_content_length, get_content_type, get_str_header},
+    prometheus::count_uploaded_size,
     types::App,
 };
 use async_compression::tokio::bufread::GzipEncoder;
@@ -17,6 +18,10 @@ use hyper::{
 };
 use serde::Deserialize;
 use serde_json::from_reader as json_from_reader;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::{debug, error, info};
 
@@ -236,12 +241,25 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     // В зависимости от типа контента определяем имя файла конечно и body конечного
     let (result_file_name, result_body) = build_name_and_body(req)?;
 
+    // Специальный счетчик выгружаемых байт
+    // Подсчитываем объем данных уже после компрессии
+    let bytes_upload_counter = Arc::new(AtomicU64::new(0));
+    let result_body = result_body.map({
+        let bytes_upload_counter = bytes_upload_counter.clone();
+        move |v| {
+            if let Ok(data) = &v {
+                bytes_upload_counter.fetch_add(data.len() as u64, Ordering::Relaxed);
+            };
+            v
+        }
+    });
+
     // Адрес запроса
     let uri = build_upload_uri(&app.app_arguments.google_bucket_name, &result_file_name).wrap_err_with_500()?;
     debug!("Request uri: {}", uri);
 
     // Объект запроса
-    let request = build_upload_request(uri, token, result_body).wrap_err_with_500()?;
+    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(result_body)).wrap_err_with_500()?;
     debug!("Request object: {:?}", request);
 
     // Объект ответа
@@ -258,6 +276,9 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
 
     // Обрабатываем в зависимости от ответа
     if status.is_success() {
+        // Подсчет выгруженных конечных данных
+        count_uploaded_size(bytes_upload_counter.load(Ordering::Acquire), true);
+
         // Данные парсим
         let info = parse_response_body(response).await?;
         debug!("Uploading result: {:?}", info);
@@ -276,6 +297,9 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
 
         Ok(response)
     } else {
+        // Подсчет выгруженных конечных данных
+        count_uploaded_size(bytes_upload_counter.load(Ordering::Acquire), true);
+
         // Данные
         let body_data = to_bytes(response)
             .await

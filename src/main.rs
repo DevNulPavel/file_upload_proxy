@@ -11,17 +11,19 @@ use self::{
     app_arguments::AppArguments,
     auth_token_provider::AuthTokenProvider,
     handlers::handle_request,
-    helpers::response_with_status_desc_and_trace_id,
-    prometheus::{count_request, count_response_status},
+    helpers::{response_with_status_and_error, response_with_status_desc_and_trace_id},
+    prometheus::{count_request, count_request_time, count_response_status, prometheus_metrics},
     types::{App, HttpClient},
 };
+use error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc};
 use eyre::WrapErr;
-use handlers::RequestProcessResult;
+use futures::FutureExt;
 use hyper::{
     body::Body as BodyStruct,
+    http::{Method, StatusCode},
     server::{conn::AddrStream, Server},
     service::{make_service_fn, service_fn},
-    Client,
+    Client, Request, Response,
 };
 use hyper_rustls::HttpsConnector;
 use std::{convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
@@ -76,6 +78,100 @@ fn initialize_logs() -> Result<(), eyre::Error> {
     Ok(())
 }
 
+/// Конвертируем Result в нормальный ответ + trace_id
+fn unwrap_result_to_response_with_trace_id(
+    res: Result<Response<BodyStruct>, ErrorWithStatusAndDesc>,
+    trace_id: &str,
+) -> Response<BodyStruct> {
+    match res {
+        Ok(response) => response,
+        Err(err) => {
+            // Выводим ошибку в консоль
+            error!("{}", err);
+
+            // Ответ в виде ошибки
+            response_with_status_desc_and_trace_id(err.status, &err.desc, trace_id)
+        }
+    }
+}
+
+/// Конвертируем Result в нормальный ответ + trace_id
+fn unwrap_result_to_response(res: Result<Response<BodyStruct>, ErrorWithStatusAndDesc>) -> Response<BodyStruct> {
+    match res {
+        Ok(response) => response,
+        Err(err) => {
+            // Выводим ошибку в консоль
+            error!("{}", err);
+
+            // Ответ в виде ошибки
+            response_with_status_and_error(err.status, &err.desc)
+        }
+    }
+}
+
+/// Непосредственно обработчик запроса без внешней мишуры
+async fn process_req(app: Arc<App>, req: Request<BodyStruct>) -> Response<BodyStruct> {
+    let method = req.method();
+    let path = req.uri().path().trim_end_matches('/');
+
+    // Делаем предварительный анализ с обработкой сервисных разных запросов
+    // Данные запросы не требуют никаких дополнительных трассировок и тд
+    match (method, path) {
+        // Заранее делаем обработку метрик, чтобы не учитывать их в общей статистике
+        (&Method::GET, "/prometheus_metrics") => unwrap_result_to_response(prometheus_metrics().await),
+
+        // Работоспособность сервиса, тоже не учитываем в статистике
+        (&Method::GET, "/health") => {
+            // Пустой ответ со статусом 200
+            let resp = hyper::Response::builder()
+                .status(StatusCode::OK)
+                .body(BodyStruct::empty())
+                .wrap_err_with_500_desc("Empty body struct build".into());
+            unwrap_result_to_response(resp)
+        }
+
+        // Все остальные пути, относящиеся к логике
+        (method, path) => {
+            // Создаем идентификатор трассировки для отслеживания ошибок в общих логах
+            let request_id = format!("{:x}", uuid::Uuid::new_v4());
+
+            // Создаем span с идентификатором трассировки
+            let span = tracing::error_span!("request", 
+                %request_id);
+            let _entered_span = span.enter();
+
+            // Увеличиваем общий счетчик запросов
+            count_request();
+
+            // Начинаем подсчет времени
+            let timer_guard = count_request_time(path, method);
+
+            // Так как владение запросом передается дальше, тогда просто создадим тут копии
+            // TODO: Ножно было бы развернуть запрос на содержимое и вернуть назад мета-информацию
+            // Обернуть Body + заголовки в отдельную структуру, а путь и метод - по ссылке передавать в обработчик
+            // Но пока обойдемся копией данных
+            let path = &path.to_owned();
+            let method = &method.clone();
+
+            // Обработка сервиса
+            let response = {
+                // Для асинхронщины обязательно проставляем текущий span для трассиовки
+                let response_res = handle_request(&app, path, method, req, &request_id).in_current_span().await;
+                unwrap_result_to_response_with_trace_id(response_res, &request_id)
+            };
+
+            // Делаем подсчет значений статусов и запросов, но кроме получаемых метрик
+            count_response_status(path, method, &response.status());
+
+            // Фиксируем затраченное время, но можно было бы просто использовать drop
+            timer_guard.observe_duration();
+
+            response
+        }
+    }
+}
+
+// Стартуем сервер
 async fn run_server(app: App) -> Result<(), eyre::Error> {
     // Перемещаем в кучу для свободного доступа из разных обработчиков
     let app = Arc::new(app);
@@ -89,52 +185,10 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
         async move {
             // Создаем сервис из функции с помощью service_fn
             Ok::<_, Infallible>(service_fn(move |req| {
-                // Увеличиваем общий счетчик запросов
-                count_request();
-
                 let app = app.clone();
 
-                async move {
-                    // Создаем идентификатор трассировки для отслеживания ошибок в общих логах
-                    let request_id = format!("{:x}", uuid::Uuid::new_v4());
-
-                    // Создаем span с идентификатором трассировки
-                    let span = tracing::error_span!("request", 
-                        %request_id);
-                    let _entered_span = span.enter();
-
-                    // Так как владение запросом передается дальше, тогда просто создадим тут копии
-                    // TODO: Ножно было бы в обработчике запроса развернуть запрос на содержимое и вернуть назад мета-информацию
-                    // Но пока обойдемся копией данных
-                    let method = req.method().to_owned();
-                    let path = req.uri().path().trim_end_matches('/').to_owned();
-
-                    // Обработка сервиса
-                    // Для асинхронщины обязательно проставляем текущий span для трассиовки
-                    let RequestProcessResult {
-                        response,
-                        allow_metric_count,
-                    } = match handle_request(&app, req, &request_id).in_current_span().await {
-                        Ok(response) => response,
-                        Err(err) => {
-                            // Выводим ошибку в консоль
-                            error!("{}", err);
-
-                            // Ответ в виде ошибки
-                            RequestProcessResult {
-                                response: response_with_status_desc_and_trace_id(err.status, &err.desc, &request_id),
-                                allow_metric_count: true,
-                            }
-                        }
-                    };
-
-                    // Делаем подсчет значений статусов и запросов, но кроме получаемых метрик
-                    if allow_metric_count {
-                        count_response_status(&path, &method, &response.status());
-                    }
-
-                    Ok::<_, Infallible>(response)
-                }
+                // Обработка запроса, мапим результат в infallible тип
+                process_req(app, req).map(Ok::<_, Infallible>)
             }))
         }
     });

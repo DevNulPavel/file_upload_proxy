@@ -56,7 +56,7 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
         .expect("Static fail response create failed") // Статически создаем ответ, здесь не критично
 }*/
 
-/*pub fn response_with_status_and_error(status: StatusCode, err_desc: &str) -> Response<BodyStruct> {
+pub fn response_with_status_and_error(status: StatusCode, err_desc: &str) -> Response<BodyStruct> {
     let error_json = format!(r#"{{"description": "{}"}}"#, err_desc);
     Response::builder()
         .status(status)
@@ -64,7 +64,7 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
         .header(header::CONTENT_LENGTH, error_json.as_bytes().len())
         .body(BodyStruct::from(error_json))
         .expect("Static fail response create failed") // Статически создаем ответ, здесь не критично
-}*/
+}
 
 pub fn response_with_status_desc_and_trace_id(status: StatusCode, err_desc: &str, trace_id: &str) -> Response<BodyStruct> {
     let error_json = format!(r#"{{"request_id": "{}", "desc": "{}"}}"#, trace_id, err_desc);

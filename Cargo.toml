@@ -34,5 +34,6 @@ tokio-util = {version = "0.6", features = ["io"]}
 serde_qs = "0.8"
 prometheus = "0.13"
 lazy_static = "1.4"
+# scopeguard = "1.1"
 # backoff = {version = "0.3", default-features = false, features = ["tokio"]}
 # pin-project = "1.0.8"

@@ -25,13 +25,16 @@ RUN_TOKIO_CONSOLE:
 	# cargo install tokio-console
 	tokio-console
 
+# Лучше использовать Docker
 RUN_PROMETHEUS_LOCAL:
 	prometheus \
 		--storage.tsdb.path "./prometheus_data/" \
 		--config.file "./monitoring_configs/prometheus/prometheus.yml" \
 		--web.external-url "http://localhost:9090"
 
-
+RUN_PROMETHEUS_AND_GRAFANA_DOCKER:
+	cd docker_compose_testing && \
+	docker-compose up
 
 ###########################################################################################
 
