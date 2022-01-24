@@ -5,6 +5,7 @@ WORKDIR /usr/src/file_upload_proxy
 COPY ./src/ ./src/
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
+COPY ./.cargo ./.cargo
 RUN \
     ls -la && \
     cargo build --release
