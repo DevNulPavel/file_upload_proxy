@@ -4,12 +4,15 @@
 ENCRYPT_TEST_ENV:
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test_google_service_account.json.asc -e env/test_google_service_account.json
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_google_service_account.json.asc -e env/prod_google_service_account.json
+	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_test_settings.env.asc -e env/prod_test_settings.env
 
 DECRYPT_TEST_ENV:
 	rm -rf env/test_google_service_account.json
 	rm -rf env/prod_google_service_account.json
+	rm -rf env/prod_test_settings.env
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/test_google_service_account.json -d env/test_google_service_account.json.asc
 	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_google_service_account.json -d env/prod_google_service_account.json.asc
+	gpg -a -r 0x0BD10E4E6E578FB6 -o env/prod_test_settings.env -d env/prod_test_settings.env.asc
 
 RUN_APP:
 	export RUST_LOG=file_upload_proxy=trace,warn && \
@@ -86,6 +89,9 @@ TEST_REQUEST_LOCAL_6:
 		-X GET \
 		"http://localhost:8888/health/"
 
+# Подключаем необходимое нам окружение для теста сервера
+include ./env/prod_test_settings.env
+
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
@@ -96,8 +102,8 @@ TEST_REQUEST_REMOTE_1:
 		-v \
 		-X GET \
 		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
-		"https://island2-web.17btest.com/upload_file/"
+		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
+		"https://${UPLOADER_API_SERVER}/upload_file/"
 
 TEST_REQUEST_REMOTE_2:
 	curl \
@@ -105,9 +111,9 @@ TEST_REQUEST_REMOTE_2:
 		-v \
 		-X POST \
 		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
+		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
 		--data-binary "@./Cargo.lock" \
-		"https://island2-web.17btest.com/upload_file/"
+		"https://${UPLOADER_API_SERVER}/upload_file/"
 
 TEST_REQUEST_REMOTE_3:
 	curl \
@@ -115,10 +121,10 @@ TEST_REQUEST_REMOTE_3:
 		-v \
 		-X POST \
 		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
+		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
 		-H "X-Filename: file_$(shell date +%Y-%m-%d_%H-%M-%S).txt" \
 		--data-binary "@./Cargo.lock" \
-		"https://island2-web.17btest.com/upload_file/"
+		"https://${UPLOADER_API_SERVER}/upload_file/"
 
 TEST_REQUEST_REMOTE_4:
 	curl \
@@ -126,21 +132,21 @@ TEST_REQUEST_REMOTE_4:
 		-v \
 		-X POST \
 		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: f7011af4-231b-473c-b983-f200f9fcb585" \
+		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
 		--data-binary "@./Cargo.lock" \
-		"https://island2-web.17btest.com/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
+		"https://${UPLOADER_API_SERVER}/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
 
 TEST_REQUEST_REMOTE_5:
 	curl \
 		-v \
 		-X GET \
-		"https://island2-web.17btest.com/prometheus_metrics/"
+		"https://${UPLOADER_API_SERVER}/prometheus_metrics/"
 
 TEST_REQUEST_REMOTE_6:
 	curl \
 		-v \
 		-X GET \
-		"https://island2-web.17btest.com/health/"
+		"https://${UPLOADER_API_SERVER}/health/"
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions
