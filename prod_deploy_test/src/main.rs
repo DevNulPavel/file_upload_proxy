@@ -21,11 +21,6 @@ impl<'a> RequestBuilder<'a> {
         Self { arguments, http_client }
     }
 
-    fn prepare(&self, method: Method, path: &str) -> reqwest::RequestBuilder {
-        let url = self.arguments.uploader_api_url.join(path).expect("Invalid join path");
-        self.http_client.request(method, url)
-    }
-
     fn prepare_with_token(&self, method: Method, path: &str) -> reqwest::RequestBuilder {
         let url = self.arguments.uploader_api_url.join(path).expect("Invalid join path");
         self.http_client
@@ -138,7 +133,7 @@ async fn main() {
     {
         let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
         let filename = format!("file_{}_2.txt", time);
-        
+
         let response = request_builder
             .prepare_with_token(Method::POST, "upload_file/")
             .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
@@ -154,6 +149,15 @@ async fn main() {
         check_valid_response(&text);
     }
 
-    // TODO: Health
-    // TODO: Metrics
+    // Проверка статуса приложения (снаружи недоступно)
+    {
+        // let response = request_builder
+        //     .prepare_with_token(Method::GET, "health/")
+        //     .send()
+        //     .await
+        //     .expect("Request execute failed");
+        // assert!(response.status().is_success(), "Health check failed");
+    }
+
+    // TODO: Metrics, но стнаружи недоступно
 }

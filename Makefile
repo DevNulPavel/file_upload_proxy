@@ -95,27 +95,14 @@ TEST_REQUEST_LOCAL_6:
 # Подключаем необходимое нам окружение для теста сервера
 # include ./env/prod_test_settings.env
 
-TEST_REQUEST_REMOTE:
-	source ./env/prod_test_settings.env && \
-	cd prod_deploy_test && \
-	cargo run
-
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
-
-TEST_REQUEST_REMOTE_5:
-	curl \
-		-v \
-		-X GET \
-		"https://${UPLOADER_API_SERVER}/prometheus_metrics/"
-
-TEST_REQUEST_REMOTE_6:
-	curl \
-		-v \
-		-X GET \
-		"https://${UPLOADER_API_SERVER}/health/"
+TEST_REQUEST_REMOTE:
+	source ./env/prod_test_settings.env && \
+	cd prod_deploy_test && \
+	cargo run
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions
