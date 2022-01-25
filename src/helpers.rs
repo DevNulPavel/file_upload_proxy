@@ -57,7 +57,7 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
 }*/
 
 pub fn response_with_status_and_error(status: StatusCode, err_desc: &str) -> Response<BodyStruct> {
-    let error_json = format!(r#"{{"description": "{}"}}"#, err_desc);
+    let error_json = format!(r#"{{"desc": "{}"}}"#, err_desc);
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())

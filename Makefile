@@ -93,51 +93,17 @@ TEST_REQUEST_LOCAL_6:
 ###########################################################################################
 
 # Подключаем необходимое нам окружение для теста сервера
-include ./env/prod_test_settings.env
+# include ./env/prod_test_settings.env
+
+TEST_REQUEST_REMOTE:
+	source ./env/prod_test_settings.env && \
+	cd prod_deploy_test && \
+	cargo run
 
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
-TEST_REQUEST_REMOTE_1:
-	curl \
-		-L \
-		-v \
-		-X GET \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
-		"https://${UPLOADER_API_SERVER}/upload_file/"
-
-TEST_REQUEST_REMOTE_2:
-	curl \
-		-L \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
-		--data-binary "@./Cargo.lock" \
-		"https://${UPLOADER_API_SERVER}/upload_file/"
-
-TEST_REQUEST_REMOTE_3:
-	curl \
-		-L \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
-		-H "X-Filename: file_$(shell date +%Y-%m-%d_%H-%M-%S).txt" \
-		--data-binary "@./Cargo.lock" \
-		"https://${UPLOADER_API_SERVER}/upload_file/"
-
-TEST_REQUEST_REMOTE_4:
-	curl \
-		-L \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: ${UPLOADER_API_TOKEN}" \
-		--data-binary "@./Cargo.lock" \
-		"https://${UPLOADER_API_SERVER}/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
 
 TEST_REQUEST_REMOTE_5:
 	curl \
