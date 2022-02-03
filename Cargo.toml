@@ -40,5 +40,5 @@ lazy_static = "1.4"
 
 # Правильнее было бы отдельную папку для текущего приложения
 # Но для маленькой утилиты тестов вполне подойдет
-[workspace]
-members = [".", "prod_deploy_test"]
+# [workspace]
+# members = [".", "prod_deploy_test"]
