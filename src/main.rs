@@ -57,16 +57,22 @@ fn initialize_logs() -> Result<(), eyre::Error> {
     // Error layer для формирования слоя ошибки по запросу
     let error_layer = tracing_error::ErrorLayer::default();
 
-    // Специальный слой для отладочной консоли tokio
-    // Используем стандартные настройки для фильтрации из переменной RUST_LOG
-    let console_layer = console_subscriber::ConsoleLayer::builder().with_default_env().spawn();
+    // Суммарный обработчик c консолью
+    #[cfg(feature = "tokio-console")]
+    let full_subscriber = {
+        // Специальный слой для отладочной консоли tokio
+        // Используем стандартные настройки для фильтрации из переменной RUST_LOG
+        let console_layer = console_subscriber::ConsoleLayer::builder().with_default_env().spawn();
+        tracing_subscriber::registry()
+            .with(console_layer)
+            .with(filter)
+            .with(error_layer)
+            .with(stdoud_sub)
+    };
 
-    // Суммарный обработчик
-    let full_subscriber = tracing_subscriber::registry()
-        .with(console_layer)
-        .with(filter)
-        .with(error_layer)
-        .with(stdoud_sub);
+    // Суммарный обработчик без консоли
+    #[cfg(not(feature = "tokio-console"))]
+    let full_subscriber = tracing_subscriber::registry().with(filter).with(error_layer).with(stdoud_sub);
 
     // Враппер для библиотеки log
     tracing_log::LogTracer::init().wrap_err("Log wrapper create failed")?;

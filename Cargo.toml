@@ -6,6 +6,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+tokio-console = ["console-subscriber", "tokio/tracing"]
+
 [dependencies]
 eyre = "0.6"
 color-eyre = "0.5"
@@ -15,9 +18,9 @@ tracing-futures = "0.2"
 tracing-log = "0.1"
 tracing-error = "0.2"
 structopt = "0.3"
-tokio = {version = "1.13", features = ["full", "tracing"]} # TODO: Оставить нужное только
-console-subscriber = "0.1" # Специальный слой для tracing для возможности отладки через tokio-console
-hyper = {version = "0.14", features = ["full"]} # TODO: Оставить нужное только
+tokio = {version = "1.13", features = ["full", "tracing"]}
+console-subscriber = {version = "0.1", optional = true}     # Специальный слой для tracing для возможности отладки через tokio-console
+hyper = {version = "0.14", features = ["full"]}
 hyper-rustls = "0.22"
 futures = "0.3"
 uuid = {version = "0.8", features = ["v4"]}
@@ -38,6 +41,7 @@ lazy_static = "1.4"
 # backoff = {version = "0.3", default-features = false, features = ["tokio"]}
 # pin-project = "1.0.8"
 
+# !!! Утилита для проверки будет отдельно, так как ломается сборка на GitHub
 # Правильнее было бы отдельную папку для текущего приложения
 # Но для маленькой утилиты тестов вполне подойдет
 # [workspace]
