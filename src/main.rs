@@ -29,7 +29,6 @@ use hyper_rustls::HttpsConnector;
 use std::{convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
 use structopt::StructOpt;
 use tracing::{debug, error};
-use tracing_futures::Instrument;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -138,7 +137,7 @@ async fn process_req(app: Arc<App>, req: Request<BodyStruct>) -> Response<BodySt
             // Создаем span с идентификатором трассировки
             let span = tracing::error_span!("request", 
                 %request_id);
-            let _entered_span = span.enter();
+            let entered_span = span.enter();
 
             // Увеличиваем общий счетчик запросов
             count_request();
@@ -156,7 +155,7 @@ async fn process_req(app: Arc<App>, req: Request<BodyStruct>) -> Response<BodySt
             // Обработка сервиса
             let response = {
                 // Для асинхронщины обязательно проставляем текущий span для трассиовки
-                let response_res = handle_request(&app, path, method, req, &request_id).in_current_span().await;
+                let response_res = handle_request(&app, path, method, req, &request_id).await;
                 unwrap_result_to_response_with_trace_id(response_res, &request_id)
             };
 
@@ -165,6 +164,9 @@ async fn process_req(app: Arc<App>, req: Request<BodyStruct>) -> Response<BodySt
 
             // Фиксируем затраченное время, но можно было бы просто использовать drop
             timer_guard.observe_duration();
+
+            drop(entered_span);
+            drop(span);
 
             response
         }
