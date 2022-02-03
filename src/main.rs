@@ -28,7 +28,7 @@ use hyper::{
 use hyper_rustls::HttpsConnector;
 use std::{convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
 use structopt::StructOpt;
-use tracing::{debug, error};
+use tracing::{debug, error, Instrument};
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -181,16 +181,21 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
     // Адрес
     let addr = SocketAddr::from(([0, 0, 0, 0], app.app_arguments.port));
 
+    // Обязательно создаем корневой span, чтобы не было проблем с наложением дочерних
+    let root_span = tracing::trace_span!("root");
+
     // Сервис необходим для каждого соединения, поэтому создаем враппер, который будет генерировать наш сервис
     let make_svc = make_service_fn(move |_: &AddrStream| {
         let app = app.clone();
+        let root_span = root_span.clone();
         async move {
             // Создаем сервис из функции с помощью service_fn
             Ok::<_, Infallible>(service_fn(move |req| {
                 let app = app.clone();
+                let root_span = root_span.clone();
 
                 // Обработка запроса, мапим результат в infallible тип
-                process_req(app, req).map(Ok::<_, Infallible>)
+                process_req(app, req).map(Ok::<_, Infallible>).instrument(root_span)
             }))
         }
     });
