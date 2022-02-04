@@ -9,7 +9,7 @@ use std::{
     time::{Duration as StdDuration, Instant},
 };
 use tokio::sync::Mutex;
-use tracing::debug;
+use tracing::{debug, Instrument};
 use tracing_log::log::warn;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +24,7 @@ impl ReceivedTokenInfo {
     async fn request(http_client: &HttpClient, account_data: &ServiceAccountData, scopes: &str) -> Result<ReceivedTokenInfo, eyre::Error> {
         // Получаем токен на основе данных
         let data = get_token_data(http_client, account_data, scopes, ChronoDuration::minutes(60))
+            .in_current_span()
             .await
             .wrap_err("Token receive")?;
 
@@ -81,7 +82,7 @@ impl AuthTokenProvider {
         }
 
         // Блокируемся, тем самым не даем другим клиентам тоже получать токены
-        let mut token_lock = self.token_info.lock().await;
+        let mut token_lock = self.token_info.lock().in_current_span().await;
 
         // Ограничиваемся количеством итераций, вдруг время жизни токена будет кривое приходить
         for request_iteration in 0..10 {
@@ -94,7 +95,9 @@ impl AuthTokenProvider {
                     debug!("Token will expire after 30 seconds, request new");
 
                     // Иначе запрашиваем токен и обновляем значение локально
-                    let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes).await;
+                    let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes)
+                        .in_current_span()
+                        .await;
 
                     // Обновляем значение или идем на новую итерацию при ошибке
                     update_token_or_warning!(load_res, token_lock, request_iteration);
@@ -105,7 +108,9 @@ impl AuthTokenProvider {
                 }
             } else {
                 // Иначе запрашиваем токен и обновляем значение локально
-                let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes).await;
+                let load_res = ReceivedTokenInfo::request(&self.http_client, &self.account_data, self.scopes)
+                    .in_current_span()
+                    .await;
                 // Обновляем значение или идем на новую итерацию при ошибке
                 update_token_or_warning!(load_res, token_lock, request_iteration);
             }

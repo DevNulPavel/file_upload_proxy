@@ -7,7 +7,7 @@ use hyper::{
     http::{method::Method, status::StatusCode},
     Request, Response,
 };
-use tracing::{error, info};
+use tracing::{error, info, Instrument};
 
 // Специальная обертка чтобы сообщить на уровень выше нужно ли подсчитывать данный запрос
 // pub struct RequestProcessResult{
@@ -35,7 +35,7 @@ pub async fn handle_request(
     // Обрабатываем путь и метод
     match (method, path) {
         // Выгружаем данные в Cloud
-        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).await.map(Into::into),
+        (&Method::POST, "/upload_file") => file_upload(app, req, request_id).in_current_span().await.map(Into::into),
 
         // Любой другой запрос
         _ => {

@@ -23,7 +23,7 @@ use std::sync::{
     Arc,
 };
 use tokio_util::io::{ReaderStream, StreamReader};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, Instrument};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,6 +110,7 @@ struct UploadResultData {
 
 async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadResultData, ErrorWithStatusAndDesc> {
     let body_data = aggregate(response)
+        .in_current_span()
         .await
         .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response receive failed".into())?;
 
@@ -235,6 +236,7 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     let token = app
         .token_provider
         .get_token()
+        .in_current_span()
         .await
         .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Google cloud token receive failed".into())?;
 
@@ -266,6 +268,7 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     let response = app
         .http_client
         .request(request)
+        .in_current_span()
         .await
         .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud error".into())?;
     debug!("Google response: {:?}", response);
@@ -280,7 +283,7 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
         count_uploaded_size(bytes_upload_counter.load(Ordering::Acquire), true);
 
         // Данные парсим
-        let info = parse_response_body(response).await?;
+        let info = parse_response_body(response).in_current_span().await?;
         debug!("Uploading result: {:?}", info);
 
         // Ссылка для загрузки c поддержкой проверки пермишенов на скачивание
@@ -302,6 +305,7 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
 
         // Данные
         let body_data = to_bytes(response)
+            .in_current_span()
             .await
             .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response receive failed".into())?;
         error!("Upload fail result: {:?}", body_data);
