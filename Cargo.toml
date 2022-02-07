@@ -42,8 +42,7 @@ lazy_static = "1.4"
 # backoff = {version = "0.3", default-features = false, features = ["tokio"]}
 # pin-project = "1.0.8"
 
-# !!! Утилита для проверки будет отдельно, так как ломается сборка на GitHub
 # Правильнее было бы отдельную папку для текущего приложения
 # Но для маленькой утилиты тестов вполне подойдет
-# [workspace]
-# members = [".", "prod_deploy_test"]
+[workspace]
+members = [".", "prod_deploy_test"]
