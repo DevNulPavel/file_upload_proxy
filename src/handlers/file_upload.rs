@@ -1,29 +1,14 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     helpers::{get_content_length, get_content_type, get_str_header},
-    prometheus::count_uploaded_size,
     types::App,
 };
 use async_compression::tokio::bufread::GzipEncoder;
 use futures::StreamExt;
-use hyper::{
-    body::{aggregate, to_bytes, Body as BodyStruct, Buf},
-    http::{
-        header,
-        method::Method,
-        status::StatusCode,
-        uri::{Authority, Uri},
-    },
-    Request, Response,
-};
+use hyper::{body::Body as BodyStruct, http::status::StatusCode, Request, Response};
 use serde::Deserialize;
-use serde_json::from_reader as json_from_reader;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
 use tokio_util::io::{ReaderStream, StreamReader};
-use tracing::{debug, error, info, Instrument};
+use tracing::{debug, info, Instrument};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,64 +46,6 @@ impl From<BodyStruct> for CompressableBody<BodyStruct, hyper::Error> {
 }*/
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn build_upload_uri(bucket_name: &str, file_name: &str) -> Result<Uri, hyper::http::Error> {
-    Uri::builder()
-        .scheme("https")
-        .authority(Authority::from_static("storage.googleapis.com"))
-        .path_and_query(format!(
-            "/upload/storage/v1/b/{}/o?name={}&uploadType=media&fields={}",
-            urlencoding::encode(bucket_name),
-            urlencoding::encode(file_name),
-            urlencoding::encode("id,name,bucket,selfLink,md5Hash,mediaLink") // Только нужные поля в ответе сервера, https://cloud.google.com/storage/docs/json_api/v1/objects#resource
-        ))
-        .build()
-}
-
-fn build_upload_request(uri: Uri, token: String, body: BodyStruct) -> Result<Request<BodyStruct>, hyper::http::Error> {
-    Request::builder()
-        .method(Method::POST)
-        .version(hyper::Version::HTTP_2)
-        .uri(uri)
-        // TODO: Что-то не так с установкой значения host, если выставить, то фейлится запрос
-        // Может быть дело в регистре?
-        // .header(header::HOST, "oauth2.googleapis.com")
-        .header(header::USER_AGENT, "hyper")
-        // .header(header::CONTENT_LENGTH, data_length)
-        .header(header::ACCEPT, mime::APPLICATION_JSON.essence_str())
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
-        .header(header::CONTENT_TYPE, mime::APPLICATION_OCTET_STREAM.essence_str())
-        .body(body)
-}
-
-// Описание
-// https://cloud.google.com/storage/docs/json_api/v1/objects#resource
-#[derive(Debug, Deserialize)]
-struct UploadResultData {
-    // id: String,
-    name: String,
-    bucket: String,
-    // #[serde(rename = "selfLink")]
-    // self_link: String,
-
-    // #[serde(rename = "md5Hash")]
-    // md5: String,
-
-    // #[serde(rename = "mediaLink")]
-    // link: String,
-}
-
-async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadResultData, ErrorWithStatusAndDesc> {
-    let body_data = aggregate(response)
-        .in_current_span()
-        .await
-        .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response receive failed".into())?;
-
-    let info = json_from_reader::<_, UploadResultData>(body_data.reader())
-        .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response parsing failed".into())?;
-
-    Ok(info)
-}
 
 fn gzip_body(body: BodyStruct) -> BodyStruct {
     let body_stream = body.map(|v| v.map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput)));
@@ -211,19 +138,39 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     // X-Real-IP
     // X-Forwarded-For
 
+    // Сразу парсим параметры Query
+    #[derive(Deserialize)]
+    struct QueryParams {
+        project_name: String,
+        filename: Option<String>,
+    }
+    let query_params: QueryParams = {
+        let query_str = req.uri().query().wrap_err_with_400_desc("Query params is missing".into())?;
+        serde_qs::from_str::<QueryParams>(query_str).wrap_err_with_400_desc("Query params parsing failed".into())?
+    };
+
+    // Ищем необходимый нам проект в зависимости от переданных данных
+    let project = app
+        .projects
+        .get(&query_params.project_name)
+        .wrap_err_with_400_desc("Requested project is not supported".into())?;
+
     // Получаем токен из запроса и проверяем
-    let token = req
-        .headers()
-        .get("X-Api-Token")
-        .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token is missing".into())
-        .and_then(|val| {
-            std::str::from_utf8(val.as_bytes()).wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token parsing failed".into())
-        })?;
-    if token != app.app_arguments.uploader_api_token {
-        return Err(ErrorWithStatusAndDesc::new_with_status_desc(
-            StatusCode::UNAUTHORIZED,
-            "Invalid api token".into(),
-        ));
+    {
+        let token = req
+            .headers()
+            .get("X-Api-Token")
+            .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token is missing".into())
+            .and_then(|val| {
+                std::str::from_utf8(val.as_bytes()).wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token parsing failed".into())
+            })?;
+
+        if project.check_token(token) {
+            return Err(ErrorWithStatusAndDesc::new_with_status_desc(
+                StatusCode::UNAUTHORIZED,
+                "Invalid api token".into(),
+            ));
+        }
     }
 
     // Получаем размер данных исходных чисто для логов
@@ -232,98 +179,11 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
         .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header is missing".into())?;
     debug!("Content-Length: {}", data_length);
 
-    // Получаем токен для Google API
-    let token = app
-        .token_provider
-        .get_token()
-        .in_current_span()
-        .await
-        .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Google cloud token receive failed".into())?;
-
     // В зависимости от типа контента определяем имя файла конечно и body конечного
+    // TODO: Name from params
+    todo!();
     let (result_file_name, result_body) = build_name_and_body(req)?;
 
-    // Специальный счетчик выгружаемых байт
-    // Подсчитываем объем данных уже после компрессии
-    let bytes_upload_counter = Arc::new(AtomicU64::new(0));
-    let result_body = result_body.map({
-        let bytes_upload_counter = bytes_upload_counter.clone();
-        move |v| {
-            if let Ok(data) = &v {
-                bytes_upload_counter.fetch_add(data.len() as u64, Ordering::Relaxed);
-            };
-            v
-        }
-    });
-
-    // Адрес запроса
-    let uri = build_upload_uri(&app.app_arguments.google_bucket_name, &result_file_name).wrap_err_with_500()?;
-    debug!("Request uri: {}", uri);
-
-    // Объект запроса
-    let request = build_upload_request(uri, token, BodyStruct::wrap_stream(result_body)).wrap_err_with_500()?;
-    debug!("Request object: {:?}", request);
-
-    // Объект ответа
-    let response = app
-        .http_client
-        .request(request)
-        .in_current_span()
-        .await
-        .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud error".into())?;
-    debug!("Google response: {:?}", response);
-
-    // Статус
-    let status = response.status();
-    debug!("Response status: {:?}", status);
-
-    // Обрабатываем в зависимости от ответа
-    if status.is_success() {
-        // Подсчет выгруженных конечных данных
-        count_uploaded_size(bytes_upload_counter.load(Ordering::Acquire), true);
-
-        // Данные парсим
-        let info = parse_response_body(response).in_current_span().await?;
-        debug!("Uploading result: {:?}", info);
-
-        // Ссылка для загрузки c поддержкой проверки пермишенов на скачивание
-        let download_link = format!("https://storage.cloud.google.com/{}/{}", info.bucket, info.name);
-
-        // Формируем ответ
-        let json_text = format!(r#"{{"link": "{}", "request_id": "{}"}}"#, download_link, request_id);
-        let response = Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
-            .header(header::CONTENT_LENGTH, json_text.as_bytes().len())
-            .body(BodyStruct::from(json_text))
-            .wrap_err_with_500()?;
-
-        Ok(response)
-    } else {
-        // Подсчет выгруженных конечных данных
-        count_uploaded_size(bytes_upload_counter.load(Ordering::Acquire), true);
-
-        // Данные
-        let body_data = to_bytes(response)
-            .in_current_span()
-            .await
-            .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response receive failed".into())?;
-        error!("Upload fail result: {:?}", body_data);
-
-        // Если есть внятный ответ - пробрасываем его
-        match std::str::from_utf8(&body_data).ok() {
-            Some(text) => {
-                error!("Upload fail result text: {}", text);
-                let resp = format!("Google error response: {}", text);
-                Err(ErrorWithStatusAndDesc::new_with_status_desc(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    resp.into(),
-                ))
-            }
-            None => Err(ErrorWithStatusAndDesc::new_with_status_desc(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Google uploading failed".into(),
-            )),
-        }
-    }
+    // Выполняем выгрузку c помощью указанного проекта
+    project.upload(result_file_name, result_body, request_id).in_current_span().await
 }

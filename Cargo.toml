@@ -1,6 +1,6 @@
 [package]
 name = "file_upload_proxy"
-version = "1.0.0"
+version = "2.0.0"
 authors = ["Pavel Ershov <devnulpavel@gmail.com>"]
 edition = "2021"
 
@@ -19,7 +19,7 @@ tracing-futures = "0.2"
 tracing-log = "0.1"
 tracing-error = "0.2"
 structopt = "0.3"
-tokio = {version = "1.13", features = ["full", "tracing"]}
+tokio = {version = "1.16", features = ["full", "tracing"]}
 console-subscriber = {version = "0.1", optional = true}     # Специальный слой для tracing для возможности отладки через tokio-console
 hyper = {version = "0.14", features = ["full"]}
 hyper-rustls = "0.22"
@@ -38,6 +38,10 @@ tokio-util = {version = "0.6", features = ["io"]}
 serde_qs = "0.8"
 prometheus = "0.13"
 lazy_static = "1.4"
+toml = "0.5"
+serde_yaml = "0.8"
+slack_client_lib = { git = "https://github.com/DevNulPavel/slack_client_lib.git", rev = "d170607a836842e3a0c2a3aeafead9964b03f845", features = ["rustls"] }
+reqwest = {version = "0.11", default-features = false, features = ["json", "multipart", "rustls-tls"]}
 # scopeguard = "1.1"
 # backoff = {version = "0.3", default-features = false, features = ["tokio"]}
 # pin-project = "1.0.8"

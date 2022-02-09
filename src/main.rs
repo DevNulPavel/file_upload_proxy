@@ -1,17 +1,21 @@
 mod app_arguments;
+mod app_config;
 mod auth_token_provider;
 mod error;
 mod handlers;
 mod helpers;
 mod oauth2;
+mod project;
 mod prometheus;
 mod types;
 
 use self::{
     app_arguments::AppArguments,
+    app_config::Config,
     auth_token_provider::AuthTokenProvider,
     handlers::handle_request,
     helpers::{response_with_status_and_error, response_with_status_desc_and_trace_id},
+    project::Project,
     prometheus::{count_request, count_request_time, count_response_status, prometheus_metrics},
     types::{App, HttpClient},
 };
@@ -26,7 +30,7 @@ use hyper::{
     Client, Request, Response,
 };
 use hyper_rustls::HttpsConnector;
-use std::{convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
 use structopt::StructOpt;
 use tracing::{debug, error, Instrument};
 
@@ -177,12 +181,12 @@ async fn process_req(app: Arc<App>, req: Request<BodyStruct>) -> Response<BodySt
 }
 
 // Стартуем сервер
-async fn run_server(app: App) -> Result<(), eyre::Error> {
+async fn run_server(port: u16, app: App) -> Result<(), eyre::Error> {
     // Перемещаем в кучу для свободного доступа из разных обработчиков
     let app = Arc::new(app);
 
     // Адрес
-    let addr = SocketAddr::from(([0, 0, 0, 0], app.app_arguments.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port)); // TODO: ???
 
     // Обязательно создаем корневой span, чтобы не было проблем с наложением дочерних
     let root_span = tracing::trace_span!("root");
@@ -227,22 +231,6 @@ async fn run_server(app: App) -> Result<(), eyre::Error> {
     Ok(())
 }
 
-/// Выполняем валидацию переданных аргументов приложения
-fn validate_arguments(arguments: &AppArguments) -> Result<(), &str> {
-    macro_rules! validate_argument {
-        ($argument: expr, $desc: literal) => {
-            if $argument == false {
-                return Err($desc);
-            }
-        };
-    }
-
-    validate_argument!(arguments.google_credentials_file.exists(), "Google credential file does not exist");
-    validate_argument!(arguments.google_credentials_file.is_file(), "Google credential file is not a file");
-    validate_argument!(!arguments.google_bucket_name.is_empty(), "Target Google bucket can't be empty");
-    Ok(())
-}
-
 fn build_http_client() -> HttpClient {
     // Коннектор для работы уже с HTTPS
     let https_connector = HttpsConnector::with_native_roots();
@@ -257,29 +245,37 @@ fn main() {
     // Бектрейсы в ошибках
     color_eyre::install().expect("Color eyre initialize failed");
 
+    // Логи
+    initialize_logs().expect("Logs init");
+
     // Аргументы приложения
     let app_arguments = AppArguments::from_args();
     debug!("App arguments: {:?}", app_arguments);
 
     // Проверка аргументов приложения
-    if let Err(err_desc) = validate_arguments(&app_arguments) {
-        eprintln!("Invalid argument: {}", err_desc);
-        exit(1);
-    }
+    app_arguments.validate_arguments().expect("Invalid argument");
 
-    // Логи
-    initialize_logs().expect("Logs init");
+    // Загружаем файлик конфига
+    let config = Config::parse_from_file(app_arguments.config).expect("Config load failed");
 
-    // Клиент для https
-    let http_client = build_http_client();
+    // Клиентs для https
+    // Клиенты разные, так как каждой библиотеке требуется своего типа клиент
+    let http_client_low_level = build_http_client();
+    let http_client_high_level = reqwest::Client::new();
 
-    // Создаем провайдер для токенов
-    let token_provider = AuthTokenProvider::new(
-        http_client.clone(),
-        &app_arguments.google_credentials_file,
-        "https://www.googleapis.com/auth/devstorage.read_write",
-    )
-    .expect("Token provider create failed");
+    // Создаем объекты проектов для всего из конфига
+    let projects = {
+        let mut projects = HashMap::with_capacity(config.projects.len());
+        for (name, config) in config.projects.into_iter() {
+            let proj =
+                Project::new(config, http_client_low_level.clone(), http_client_high_level.clone()).expect("Project object create error");
+            projects.insert(name, proj);
+        }
+        projects
+    };
+
+    // Контейнер со всеми менеджерами и тд
+    let app = App { projects };
 
     // Создаем рантайм для работы сервера
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -287,13 +283,8 @@ fn main() {
         .build()
         .expect("Tokio runtime build");
 
-    // Контейнер со всеми менеджерами
-    let app = App {
-        app_arguments,
-        http_client,
-        token_provider,
-    };
-
     // Стартуем сервер
-    runtime.block_on(run_server(app)).expect("Server running fail");
+    runtime
+        .block_on(run_server(config.settings.port, app))
+        .expect("Server running fail");
 }
