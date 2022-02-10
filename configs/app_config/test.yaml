@@ -8,9 +8,9 @@ projects:
       bucket_name: "dev_test_public_bucket"
     slack_link_dub:
       token: "xoxb-3152873974-1566924779632-t1fvjXIUm5qZwQ7OpYoPcd07"
-      targets: ["@U0JU3ACSJ", "#CQL2AKQ80"]
+      targets: ["@U0JU3ACSJ", "#mur-file_upload_proxy_channel", "#mur-test_node_upload"]
       qr_code: true
-      text_before: "TEST_PREFIX"
+      text_before: "TEST_PREFIX: "
   mm:
     api_token: "test_api_token_value_mm"
     google_storage_target:
@@ -18,6 +18,6 @@ projects:
         bucket_name: "dev_test_private_bucket"
     slack_link_dub:
         token: "xoxb-3152873974-1566924779632-t1fvjXIUm5qZwQ7OpYoPcd07"
-        targets: ["@U0JU3ACSJ", "#CQL2AKQ80"]
+        targets: ["@U0JU3ACSJ", "#mur-file_upload_proxy_channel", "#mur-test_node_upload"]
         qr_code: true
-        text_before: "TEST_PREFIX"
+        text_before: "TEST_PREFIX: "

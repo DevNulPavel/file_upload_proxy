@@ -1,24 +1,23 @@
 use crate::{
-    app_config::{GoogleStorageConfig, ProjectConfig, SlackConfig},
+    app_config::GoogleStorageConfig,
     auth_token_provider::AuthTokenProvider,
-    error::{WrapErrorWithStatusAndDesc, ErrorWithStatusAndDesc},
+    error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
     prometheus::count_uploaded_size,
     types::HttpClient,
 };
 use eyre::WrapErr;
+use futures::StreamExt;
 use hyper::{
-    body::{Body as BodyStruct, aggregate, to_bytes, Buf},
+    body::{aggregate, to_bytes, Body as BodyStruct, Buf},
     http::{
+        header,
+        method::Method,
         uri::{Authority, Uri},
         StatusCode,
-        method::Method,
-        header,
     },
     Request, Response,
 };
 use serde::Deserialize;
-use futures::StreamExt;
-use slack_client_lib::SlackClient;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -83,14 +82,14 @@ async fn parse_response_body(response: Response<BodyStruct>) -> Result<UploadRes
     Ok(info)
 }
 
-struct GoogleUploader {
+pub struct GoogleUploader {
     http_client: HttpClient,
     token_provider: AuthTokenProvider,
     target_bucket: String,
 }
 
 impl GoogleUploader {
-    fn new(http_client: HttpClient, google_config: GoogleStorageConfig) -> Result<GoogleUploader, eyre::Error> {
+    pub fn new(http_client: HttpClient, google_config: GoogleStorageConfig) -> Result<GoogleUploader, eyre::Error> {
         // Создаем провайдер для токенов
         let token_provider = AuthTokenProvider::new(
             http_client.clone(),
@@ -106,7 +105,7 @@ impl GoogleUploader {
         })
     }
 
-    async fn upload(&self, filename: &str, body: BodyStruct) -> Result<String, ErrorWithStatusAndDesc> {
+    pub async fn upload(&self, filename: &str, body: BodyStruct) -> Result<String, ErrorWithStatusAndDesc> {
         // Получаем токен для Google API
         let token = self
             .token_provider
@@ -192,73 +191,5 @@ impl GoogleUploader {
                 )),
             }
         }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////
-
-struct SlackLinkSender {
-    client: SlackClient,
-    targets: Vec<String>,
-    qr_code: bool,
-    text_before: Option<String>,
-}
-
-impl SlackLinkSender {
-    fn new(http_client: reqwest::Client, config: SlackConfig) -> SlackLinkSender {
-        let client = SlackClient::new(http_client, config.token);
-
-        SlackLinkSender {
-            client,
-            targets: config.targets,
-            qr_code: config.qr_code,
-            text_before: config.text_before,
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////
-
-pub struct Project {
-    api_token: String,
-    google_uploader: GoogleUploader,
-    slack_link_sender: Option<SlackLinkSender>,
-}
-
-impl Project {
-    pub fn new(
-        config: ProjectConfig,
-        http_client_low_level: HttpClient,
-        http_client_high_level: reqwest::Client,
-    ) -> Result<Project, eyre::Error> {
-        let google_uploader = GoogleUploader::new(http_client_low_level, config.google_storage_target)?;
-
-        let slack_link_sender = config.slack_link_dub.map(|conf| SlackLinkSender::new(http_client_high_level, conf));
-
-        Ok(Project {
-            api_token: config.api_token,
-            google_uploader,
-            slack_link_sender,
-        })
-    }
-
-    pub fn check_token(&self, token: &str) -> bool {
-        self.api_token.eq(token)
-    }
-
-    pub async fn upload(&self, file_name: String, body: BodyStruct, request_id: &str) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
-        // Загружаем в Storage
-        let download_link = self.google_uploader.upload(file_name.as_str(), body).in_current_span().await?;
-
-        // Формируем ответ
-        let json_text = format!(r#"{{"link": "{}", "request_id": "{}"}}"#, download_link, request_id);
-        let response = Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())
-            .header(header::CONTENT_LENGTH, json_text.as_bytes().len())
-            .body(BodyStruct::from(json_text))
-            .wrap_err_with_500()?;
-
-        Ok(response)
     }
 }
