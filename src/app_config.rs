@@ -7,20 +7,20 @@ use std::{
 };
 
 /// Настройки для всего приложения
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SettingsConfig {
     pub port: u16,
 }
 
 /// Настройки для проекта и выгрузки в CloudStorage
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct GoogleStorageConfig {
     pub credentials_file: PathBuf,
     pub bucket_name: String,
 }
 
 /// Настройки для проекта и выгрузки в Slack
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SlackConfig {
     pub token: String,
     pub targets: Vec<String>,
@@ -29,7 +29,7 @@ pub struct SlackConfig {
 }
 
 /// Описание для отдельного проекта
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct ProjectConfig {
     pub api_token: String,
     pub google_storage_target: GoogleStorageConfig,
@@ -37,7 +37,7 @@ pub struct ProjectConfig {
 }
 
 /// Конфиг нашего приложения
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub settings: SettingsConfig,
     pub projects: HashMap<String, ProjectConfig>,

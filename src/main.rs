@@ -12,7 +12,6 @@ mod types;
 use self::{
     app_arguments::AppArguments,
     app_config::Config,
-    auth_token_provider::AuthTokenProvider,
     handlers::handle_request,
     helpers::{response_with_status_and_error, response_with_status_desc_and_trace_id},
     project::Project,
@@ -30,7 +29,7 @@ use hyper::{
     Client, Request, Response,
 };
 use hyper_rustls::HttpsConnector;
-use std::{collections::HashMap, convert::Infallible, net::SocketAddr, process::exit, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr, sync::Arc};
 use structopt::StructOpt;
 use tracing::{debug, error, Instrument};
 
@@ -267,6 +266,7 @@ fn main() {
     let projects = {
         let mut projects = HashMap::with_capacity(config.projects.len());
         for (name, config) in config.projects.into_iter() {
+            debug!("Project {} config: {:?}", name, config);
             let proj =
                 Project::new(config, http_client_low_level.clone(), http_client_high_level.clone()).expect("Project object create error");
             projects.insert(name, proj);

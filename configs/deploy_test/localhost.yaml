@@ -1,0 +1,8 @@
+url: "http://localhost:8080/"
+projects:
+  # PI2
+  - name: "pi2"
+    api_token: "test_api_token_value_pi2"
+  # Mystery manor
+  - name: "mm"
+    api_token: "test_api_token_value_mm"    

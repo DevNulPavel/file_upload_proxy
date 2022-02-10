@@ -1,6 +1,6 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
-    helpers::{get_content_length, get_content_type, get_str_header},
+    helpers::{get_content_length, get_content_type, get_required_str_header, get_str_header},
     types::App,
 };
 use async_compression::tokio::bufread::GzipEncoder;
@@ -138,34 +138,20 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     // X-Real-IP
     // X-Forwarded-For
 
-    // Сразу парсим параметры Query
-    #[derive(Deserialize)]
-    struct QueryParams {
-        project_name: String,
-        filename: Option<String>,
-    }
-    let query_params: QueryParams = {
-        let query_str = req.uri().query().wrap_err_with_400_desc("Query params is missing".into())?;
-        serde_qs::from_str::<QueryParams>(query_str).wrap_err_with_400_desc("Query params parsing failed".into())?
-    };
+    // Получаем имя проекта из заголовков
+    let project_name = get_required_str_header(req.headers(), "X-Project-Name").wrap_err_with_400_desc("Project name error".into())?;
 
     // Ищем необходимый нам проект в зависимости от переданных данных
     let project = app
         .projects
-        .get(&query_params.project_name)
+        .get(project_name)
         .wrap_err_with_400_desc("Requested project is not supported".into())?;
 
     // Получаем токен из запроса и проверяем
     {
-        let token = req
-            .headers()
-            .get("X-Api-Token")
-            .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token is missing".into())
-            .and_then(|val| {
-                std::str::from_utf8(val.as_bytes()).wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token parsing failed".into())
-            })?;
-
-        if project.check_token(token) {
+        let token = get_required_str_header(req.headers(), "X-Api-Token")
+            .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token parsing failed".into())?;
+        if !project.check_token(token) {
             return Err(ErrorWithStatusAndDesc::new_with_status_desc(
                 StatusCode::UNAUTHORIZED,
                 "Invalid api token".into(),
@@ -180,8 +166,6 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     debug!("Content-Length: {}", data_length);
 
     // В зависимости от типа контента определяем имя файла конечно и body конечного
-    // TODO: Name from params
-    todo!();
     let (result_file_name, result_body) = build_name_and_body(req)?;
 
     // Выполняем выгрузку c помощью указанного проекта

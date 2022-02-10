@@ -1,4 +1,4 @@
-use eyre::WrapErr;
+use eyre::{ContextCompat, WrapErr};
 use hyper::{
     body::Body as BodyStruct,
     http::{header, HeaderMap, StatusCode},
@@ -35,7 +35,7 @@ pub fn get_content_type(headers: &HeaderMap) -> Result<Option<Mime>, eyre::Error
 }
 
 /// Получаем произвольный header и парсим в строку
-pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'a str>, eyre::Error>{
+pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'a str>, eyre::Error> {
     let header_val = match headers.get(key) {
         Some(val) => val,
         None => return Ok(None),
@@ -43,9 +43,20 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
 
     let val = header_val
         .to_str()
-        .wrap_err("Content type header to string convert failed")?;
+        .wrap_err_with(|| format!("Header {} to string convert failed", key))?;
 
     Ok(Some(val))
+}
+
+/// Получаем произвольный header и парсим в строку
+pub fn get_required_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<&'a str, eyre::Error> {
+    let header_val = headers.get(key).wrap_err_with(|| format!("Header {} is missing", key))?;
+
+    let val = header_val
+        .to_str()
+        .wrap_err_with(|| format!("Header {} to string convert failed", key))?;
+
+    Ok(val)
 }
 
 /*pub fn response_with_status_and_empty_body(status: StatusCode) -> Response<BodyStruct> {

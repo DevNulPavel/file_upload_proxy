@@ -41,7 +41,7 @@ jobs:
                 context: ./
                 file: ./Dockerfile
                 push: true
-                tags: devnul/file_upload_proxy:latest
+                tags: devnul/file_upload_proxy:v2.0.0
 
             - name: Image digest
               run: echo ${{ steps.docker_build.outputs.digest }}

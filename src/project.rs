@@ -171,13 +171,16 @@ impl GoogleUploader {
                 .in_current_span()
                 .await
                 .wrap_err_with_status_desc(StatusCode::INTERNAL_SERVER_ERROR, "Google cloud response receive failed".into())?;
-            error!("Upload fail result: {:?}", body_data);
+            //error!("Upload fail result: {:?}", body_data);
 
             // Если есть внятный ответ - пробрасываем его
             match std::str::from_utf8(&body_data).ok() {
                 Some(text) => {
-                    error!("Upload fail result text: {}", text);
-                    let resp = format!("Google error response: {}", text);
+                    // Сделаем минификацию JSON чтобы в одну строку влезало и не было переносов
+                    let minified_text = minify::json::minify(text);
+
+                    error!("Upload fail result text: {}", minified_text);
+                    let resp = format!("Google error response: {}", minified_text);
                     Err(ErrorWithStatusAndDesc::new_with_status_desc(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         resp.into(),
