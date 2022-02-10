@@ -2,3 +2,4 @@
 target/
 env/
 prometheus_data/
+settings/
