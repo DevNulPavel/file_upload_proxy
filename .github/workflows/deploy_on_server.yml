@@ -4,7 +4,7 @@ on:
   # Запуск экшена будет на ветке main
     workflow_dispatch:
         branches:
-            - main
+            - v1.0.0
 
 jobs:
     deploy_on_server:
