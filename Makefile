@@ -1,26 +1,26 @@
 .PHONY:
 .SILENT:
 
-ENCRYPT_SETTINGS:
-	rm -rf settings.tar.gz
-	rm -rf settings.tar.gz.asc
-	tar -czf settings.tar.gz settings/
-	gpg -a -r 0x0BD10E4E6E578FB6 --output settings.tar.gz.asc --encrypt settings.tar.gz
-	rm -rf settings.tar.gz
+ENCRYPT_CONFIGS:
+	rm -rf configs.tar.gz
+	rm -rf configs.tar.gz.asc
+	tar -czf configs.tar.gz configs/
+	gpg -a -r 0x0BD10E4E6E578FB6 --output configs.tar.gz.asc --encrypt configs.tar.gz
+	rm -rf configs.tar.gz
 
-DECRYPT_SETTINGS:
-	rm -rf settings/
-	rm -rf settings.tar.gz
-	gpg -a -r 0x0BD10E4E6E578FB6 --output settings.tar.gz -d settings.tar.gz.asc
-	tar -xzf settings.tar.gz
-	rm -rf settings.tar.gz
+DECRYPT_CONFIGS:
+	rm -rf configs/
+	rm -rf configs.tar.gz
+	gpg -a -r 0x0BD10E4E6E578FB6 --output configs.tar.gz -d configs.tar.gz.asc
+	tar -xzf configs.tar.gz
+	rm -rf configs.tar.gz
 
 RUN_APP:
 	export RUST_LOG=file_upload_proxy=trace,warn && \
 	cargo clippy && \
 	cargo build --release && \
 	target/release/file_upload_proxy \
-		--config "./settings/app_config/test.yaml"
+		--config "./configs/app_config/test.yaml"
 
 RUN_TOKIO_CONSOLE:
 	# cargo install tokio-console
@@ -30,7 +30,7 @@ RUN_TOKIO_CONSOLE:
 RUN_PROMETHEUS_LOCAL:
 	prometheus \
 		--storage.tsdb.path "./prometheus_data/" \
-		--config.file "./monitoring_settings/prometheus/prometheus.yml" \
+		--config.file "./monitoring_configs/prometheus/prometheus.yml" \
 		--web.external-url "http://localhost:9090"
 
 RUN_PROMETHEUS_AND_GRAFANA_DOCKER:
@@ -91,7 +91,7 @@ TEST_REQUEST_LOCAL_6:
 ###########################################################################################
 
 # Подключаем необходимое нам окружение для теста сервера
-# include ./env/prod_test_settings.env
+# include ./env/prod_test_configs.env
 
 # nginx сейчас настроен для редиректов, поэтому требуется флаг -L
 # При использовании нативной библиотеки нужно проставлять флаг
@@ -99,11 +99,11 @@ TEST_REQUEST_LOCAL_6:
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
 TEST_REQUEST_REMOTE:
 	cd test_app && \
-	cargo run -- --config=../settings/deploy_test/prod.yaml
+	cargo run -- --config=../configs/deploy_test/prod.yaml
 
 TEST_REQUEST_LOCALHOST:
 	cd test_app && \
-	cargo run -- --config=../settings/deploy_test/localhost.yaml
+	cargo run -- --config=../configs/deploy_test/localhost.yaml
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions
