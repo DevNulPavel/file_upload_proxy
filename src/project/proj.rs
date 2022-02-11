@@ -47,14 +47,30 @@ impl Project {
         &self,
         file_name: String,
         body: BodyStruct,
+        link_to_slack: bool,
+        slack_text_prefix: Option<String>,
         request_id: &str,
     ) -> Result<Response<BodyStruct>, ErrorWithStatusAndDesc> {
+        // Заранее проверим перед выгрузкой: можем ли мы постить в слак если хотят этого?
+        let slack_sender = if link_to_slack {
+            if self.slack_link_sender.is_some() {
+                self.slack_link_sender.as_ref()
+            } else {
+                return Err(ErrorWithStatusAndDesc::new_with_status_desc(
+                    StatusCode::BAD_REQUEST,
+                    "Slack posting is not configured for this application".into(),
+                ));
+            }
+        } else {
+            None
+        };
+
         // Загружаем в Storage
         let download_link = self.google_uploader.upload(file_name.as_str(), body).in_current_span().await?;
 
         // Дублируем ссылку в Slack если нужно
-        if let Some(slack) = self.slack_link_sender.as_ref() {
-            slack.post_link(&download_link).in_current_span().await?;
+        if let Some(slack) = slack_sender {
+            slack.post_link(&download_link, slack_text_prefix).in_current_span().await?;
         }
 
         // Формируем ответ

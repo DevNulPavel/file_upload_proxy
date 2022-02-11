@@ -165,8 +165,13 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     struct Query {
         filename: Option<String>,
         slack_send: Option<bool>,
+        slack_text_prefix: Option<String>,
     }
-    let Query{filename, slack_send} = if let Some(query_text) = req.uri().query() {
+    let Query {
+        filename,
+        slack_send,
+        slack_text_prefix,
+    } = if let Some(query_text) = req.uri().query() {
         serde_qs::from_str::<Query>(query_text).wrap_err_with_400_desc("Query parsing error".into())?
     } else {
         Default::default()
@@ -182,16 +187,24 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     let (result_file_name, result_body) = build_name_and_body(req, filename)?;
 
     // Выполняем выгрузку c помощью указанного проекта
-    project.upload(result_file_name, result_body, request_id).in_current_span().await
+    project
+        .upload(
+            result_file_name,
+            result_body,
+            slack_send.unwrap_or(false),
+            slack_text_prefix,
+            request_id,
+        )
+        .in_current_span()
+        .await
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use serde::Deserialize;
 
     #[test]
-    fn test_query_deserealize(){
+    fn test_query_deserealize() {
         {
             #[derive(Debug, Deserialize, Default)]
             struct Query<'a> {

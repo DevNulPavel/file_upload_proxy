@@ -12,7 +12,7 @@ use slack_client_lib::{
     SlackThreadImageTarget,
 };
 use std::borrow::Cow;
-use tracing::{Instrument, debug};
+use tracing::{debug, Instrument};
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +49,7 @@ pub struct SlackLinkSender {
     client: SlackClient,
     targets: Vec<String>,
     qr_code: bool,
-    text_before: Option<String>,
+    default_text_before: Option<String>,
 }
 
 impl SlackLinkSender {
@@ -60,29 +60,25 @@ impl SlackLinkSender {
             client,
             targets: config.targets,
             qr_code: config.qr_code,
-            text_before: config.text_before,
+            default_text_before: config.default_text_before,
         }
     }
 
     /// Выдаем в слак нашу ссылку
-    pub async fn post_link(&self, link: &str) -> Result<(), ErrorWithStatusAndDesc> {
+    pub async fn post_link(&self, link: &str, text_prefix: Option<String>) -> Result<(), ErrorWithStatusAndDesc> {
         // Формируем текст сообщения
-        let text = if let Some(text_before) = self.text_before.as_ref() {
-            let mut text = text_before.clone();
+        let text = if let Some(mut text) = text_prefix.or_else(|| self.default_text_before.clone()) {
             text.push_str(link);
-            Cow::Owned(text)
+            text
         } else {
-            Cow::Borrowed(link)
+            format!("Download file link: {link}")
         };
 
         // Футура ожидания сообщений от всех таргетов
-        let futures_iter = self
-            .targets
-            .iter()
-            .map(|target| {
-                debug!("Send message to target: {} -> {}", text, target);
-                self.client.send_message(&text, SlackChannelMessageTarget::new(target))
-            });
+        let futures_iter = self.targets.iter().map(|target| {
+            debug!("Send message to target: {} -> {}", text, target);
+            self.client.send_message(&text, SlackChannelMessageTarget::new(target))
+        });
 
         // Делаем запрос выгрузки в каждый таргет сообщения
         let send_results = futures::future::try_join_all(futures_iter).in_current_span().await.map_err(|err| {
@@ -91,7 +87,7 @@ impl SlackLinkSender {
 
         // Отправляем QR код в треды
         if self.qr_code {
-            let qr_code_image = create_qr_data(&text).wrap_err_with_500_desc("QR code create failed".into())?;
+            let qr_code_image = create_qr_data(link).wrap_err_with_500_desc("QR code create failed".into())?;
 
             let qr_send_iter = send_results.iter().filter_map(|v| v.as_ref()).map(|message| {
                 self.client.send_image(

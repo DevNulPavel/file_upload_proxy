@@ -1,6 +1,6 @@
 # Сборка с помощью пакета Rust
 # https://hub.docker.com/_/rust
-FROM rust:1.56.1 as builder
+FROM rust:latest as builder
 WORKDIR /usr/src/file_upload_proxy
 COPY ./prod_deploy_test/ ./prod_deploy_test/
 COPY ./src/ ./src/

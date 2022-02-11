@@ -25,7 +25,7 @@ pub struct SlackConfig {
     pub token: String,
     pub targets: Vec<String>,
     pub qr_code: bool,
-    pub text_before: Option<String>,
+    pub default_text_before: Option<String>,
 }
 
 /// Описание для отдельного проекта

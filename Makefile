@@ -1,19 +1,8 @@
 .PHONY:
 .SILENT:
 
-ENCRYPT_CONFIGS:
-	rm -rf configs.tar.gz
-	rm -rf configs.tar.gz.asc
-	tar -czf configs.tar.gz configs/
-	gpg -a -r 0x0BD10E4E6E578FB6 --output configs.tar.gz.asc --encrypt configs.tar.gz
-	rm -rf configs.tar.gz
-
 DECRYPT_CONFIGS:
-	rm -rf configs/
-	rm -rf configs.tar.gz
-	gpg -a -r 0x0BD10E4E6E578FB6 --output configs.tar.gz -d configs.tar.gz.asc
-	tar -xzf configs.tar.gz
-	rm -rf configs.tar.gz
+	git-crypt unlock
 
 RUN_APP:
 	export RUST_LOG=file_upload_proxy=trace,warn && \
