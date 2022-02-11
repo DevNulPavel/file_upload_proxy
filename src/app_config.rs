@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
     fs::{self, File},
     io::BufReader,
     path::PathBuf,
@@ -40,7 +39,7 @@ pub struct ProjectConfig {
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub settings: SettingsConfig,
-    pub projects: HashMap<String, ProjectConfig>,
+    pub projects: Vec<ProjectConfig>,
 }
 
 impl Config {
@@ -78,7 +77,7 @@ impl Config {
         ensure!(!self.projects.is_empty(), "Empty projects list");
 
         // Проверим каждый проект
-        for (key, proj) in self.projects.iter() {
+        for (key, proj) in self.projects.iter().enumerate() {
             // Токен
             ensure!(!proj.api_token.is_empty(), "Project {}: empty token", key);
 
@@ -122,7 +121,7 @@ mod tests {
     fn test_results(config: Config) {
         assert_eq!(config.settings.port, 8080);
 
-        let project_config = config.projects.get("pi2").unwrap();
+        let project_config = config.projects.get(0).unwrap();
         assert_eq!(project_config.api_token, "TOKEN_VALUE");
 
         let google_storage_info = &project_config.google_storage_target;
@@ -134,36 +133,38 @@ mod tests {
 
     #[test]
     fn test_toml_config_parsing() {
+        // TODO: FIX IT
+
         #[rustfmt::skip]
         let config: Config = toml::from_str(r#"
             [settings]
             port = 8080
 
-            [projects.pi2]
+            [[projects]]
             api_token = "TOKEN_VALUE"
-
-            [projects.pi2.google_storage_target]
+            
+            [[projects]]
             credentials_file = "/TEST/CREDENTIALS_FILE.json"
             bucket_name = "PI2_BUCKET_NAME"
 
-            [projects.pi2.slack_link_dub]
+            [[projects.slack_link_dub]]
             token = "asdasd"
             targets = ["asdasd", "asdads", "asdasd"]
             qr_code = true
-            text_before = "qweqwe"
+            default_text_before = "qweqwe"
 
-            [projects.mm]
+            [[projects]]
             api_token = "bffbf"
 
-            [projects.mm.google_storage_target]
+            [[projects.google_storage_target]]
             credentials_file = "/asd/asdasasdasdd.json"
             bucket_name = "asdasd"
 
-            [projects.mm.slack_link_dub]
+            [[projects.slack_link_dub]]
             token = "sffsdf"
             targets = ["asdasd", "asdasd"]
             qr_code = true
-            text_before = "sfsdf"   
+            default_text_before = "sfsdf"   
         "#)
         .expect("Toml config parsing failed");
 
@@ -175,10 +176,9 @@ mod tests {
         #[rustfmt::skip]
         let config: Config = serde_yaml::from_str(r#"
             settings:
-                port: 8080
+              port: 8080
             projects:
-                pi2:
-                    api_token: "TOKEN_VALUE"
+                  - api_token: "TOKEN_VALUE"
                     google_storage_target:
                         credentials_file: "/TEST/CREDENTIALS_FILE.json"
                         bucket_name: "PI2_BUCKET_NAME"
@@ -186,9 +186,8 @@ mod tests {
                         token: "asdasd"
                         targets: ["asdasd", "asdads", "asdasd"]
                         qr_code: true
-                        text_before: "qweqwe"                        
-                mm:
-                    api_token: "asddasd"
+                        default_text_before: "qweqwe"
+                  - api_token: "asddasd"
                     google_storage_target:
                         credentials_file: "/asd/asdasd.json"
                         bucket_name: "dfgdfg"
@@ -196,7 +195,7 @@ mod tests {
                         token: "asdasd"
                         targets: ["sfdsf", "sfds", "sdfds"]
                         qr_code: true
-                        text_before: "dfgdfg"                        
+                        default_text_before: "dfgdfg"
         "#)
         .expect("Yaml config parsing failed");
 
@@ -211,8 +210,8 @@ mod tests {
                 "settings": {
                     "port": 8080
                 },
-                "projects": {
-                    "pi2": {
+                "projects": [
+                    {
                         "api_token": "TOKEN_VALUE",
                         "google_storage_target": {
                             "credentials_file": "/TEST/CREDENTIALS_FILE.json",
@@ -222,10 +221,10 @@ mod tests {
                             "token": "asdasd",
                             "targets": ["qweasd", "asdasdas"],
                             "qr_code": true,
-                            "text_before": "asdasda"
+                            "default_text_before": "asdasda"
                         }                        
                     },
-                    "mm": {
+                    {
                         "api_token": "fgdfg",
                         "google_storage_target": {
                             "credentials_file": "test/test.json",
@@ -235,10 +234,10 @@ mod tests {
                             "token": "sdfdsf",
                             "targets": ["sdf", "sdf"],
                             "qr_code": true,
-                            "text_before": "sdfsdf"
+                            "default_text_before": "sdfsdf"
                         }                        
                     }
-                }
+                ]
             }
         "#).expect("Json parsing failed");
 

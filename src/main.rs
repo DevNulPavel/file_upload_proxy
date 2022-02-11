@@ -265,11 +265,16 @@ fn main() {
     // Создаем объекты проектов для всего из конфига
     let projects = {
         let mut projects = HashMap::with_capacity(config.projects.len());
-        for (name, config) in config.projects.into_iter() {
-            debug!("Project {} config: {:?}", name, config);
-            let proj =
-                Project::new(config, http_client_low_level.clone(), http_client_high_level.clone()).expect("Project object create error");
-            projects.insert(name, proj);
+        for (index, config) in config.projects.into_iter().enumerate() {
+            debug!("Project {} config: {:?}", index, config);
+            let proj = Project::new(
+                config.google_storage_target,
+                config.slack_link_dub,
+                http_client_low_level.clone(),
+                http_client_high_level.clone(),
+            )
+            .expect("Project object create error");
+            projects.insert(config.api_token, proj);
         }
         projects
     };

@@ -11,7 +11,6 @@ use crate::helpers::deserialize_url;
 /// Описание для отдельного проекта
 #[derive(Deserialize)]
 pub struct ProjectConfig {
-    pub name: String,
     pub api_token: String,
 }
 
@@ -62,9 +61,6 @@ impl Config {
 
         // Проверим каждый проект
         for proj in self.projects.iter() {
-            // Name
-            ensure!(!proj.name.is_empty(), "Empty name");
-
             // Токен
             ensure!(!proj.api_token.is_empty(), "Empty token");
         }

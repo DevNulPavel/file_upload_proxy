@@ -116,26 +116,18 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     // X-Real-IP
     // X-Forwarded-For
 
-    // Получаем имя проекта из заголовков
-    let project_name = get_required_str_header(req.headers(), "X-Project-Name").wrap_err_with_400_desc("Project name error".into())?;
-
-    // Ищем необходимый нам проект в зависимости от переданных данных
-    let project = app
-        .projects
-        .get(project_name)
-        .wrap_err_with_400_desc("Requested project is not supported".into())?;
-
-    // Получаем токен из запроса и проверяем
-    {
+    // Ищем проект
+    let project = {
+        // Получаем токен из запроса и проверяем
         let token = get_required_str_header(req.headers(), "X-Api-Token")
             .wrap_err_with_status_desc(StatusCode::UNAUTHORIZED, "Api token parsing failed".into())?;
-        if !project.check_token(token) {
-            return Err(ErrorWithStatusAndDesc::new_with_status_desc(
-                StatusCode::UNAUTHORIZED,
-                "Invalid api token".into(),
-            ));
-        }
-    }
+
+        // Ищем необходимый нам проект в зависимости от переданных данных
+        app
+            .projects
+            .get(token)
+            .wrap_err_with_400_desc("Requested project is missing".into())?
+    };
 
     // Один раз распарсим query строку
     #[derive(Debug, Deserialize, Default)]

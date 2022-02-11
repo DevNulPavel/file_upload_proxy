@@ -12,7 +12,6 @@ use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use structopt::StructOpt;
 
-const PROJECT_HEADER_KEY: &str = "X-Project-Name";
 const TOKEN_HEADER_KEY: &str = "X-Api-Token";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,23 +19,16 @@ const TOKEN_HEADER_KEY: &str = "X-Api-Token";
 struct RequestBuilder {
     http_client: Client,
     url: Url,
-    project: String,
     token: String,
 }
 impl RequestBuilder {
-    fn new(http_client: Client, url: Url, project: String, token: String) -> Self {
-        Self {
-            http_client,
-            url,
-            project,
-            token,
-        }
+    fn new(http_client: Client, url: Url, token: String) -> Self {
+        Self { http_client, url, token }
     }
 
     fn prepare_with_token(&self, method: Method) -> reqwest::RequestBuilder {
         self.http_client
             .request(method, self.url.clone())
-            .header(PROJECT_HEADER_KEY, self.project.clone()) // Добавляем имя проекта
             .header(TOKEN_HEADER_KEY, self.token.clone()) // Добавляем токен
     }
 }
@@ -52,7 +44,7 @@ enum Response {
         link: Url,
         #[allow(dead_code)]
         request_id: String,
-        slack_sent: bool
+        slack_sent: bool,
     },
     Error {
         desc: String,
@@ -93,7 +85,7 @@ async fn main() {
 
     // Обходим все указанные проекты в аргументах
     for project in config.projects {
-        let request_builder = RequestBuilder::new(http_client.clone(), config.file_upload_url.clone(), project.name, project.api_token);
+        let request_builder = RequestBuilder::new(http_client.clone(), config.file_upload_url.clone(), project.api_token);
 
         // Запрос должен быть с ошибкой
         {
@@ -150,9 +142,7 @@ async fn main() {
             let response = request_builder
                 .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
-                .query(&[
-                    ("slack_send", "true")
-                ])
+                .query(&[("slack_send", "true")])
                 .body("Custom test data")
                 .send()
                 .await
@@ -168,10 +158,7 @@ async fn main() {
             let response = request_builder
                 .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
-                .query(&[
-                    ("slack_send", "true"),
-                    ("slack_text_prefix", "Custom prefix text from query: "),
-                ])
+                .query(&[("slack_send", "true"), ("slack_text_prefix", "Custom prefix text from query: ")])
                 .body("Custom test data")
                 .send()
                 .await
