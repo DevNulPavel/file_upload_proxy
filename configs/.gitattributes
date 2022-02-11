@@ -1,0 +1,3 @@
+.gitignore !filter !diff
+.gitattributes !filter !diff
+*/** filter=git-crypt diff=git-crypt
