@@ -2,7 +2,7 @@
 # https://hub.docker.com/_/rust
 FROM rust:latest as builder
 WORKDIR /usr/src/file_upload_proxy
-COPY ./prod_deploy_test/ ./prod_deploy_test/
+COPY ./test_app/ ./test_app/
 COPY ./src/ ./src/
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
