@@ -28,57 +28,6 @@ RUN_PROMETHEUS_AND_GRAFANA_DOCKER:
 
 ###########################################################################################
 
-TEST_REQUEST_LOCAL_1:
-	curl \
-		-v \
-		-X GET \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: test-api-token-aaa-bbb" \
-		"http://localhost:8888/upload_file/"
-
-TEST_REQUEST_LOCAL_2:
-	curl \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: test-api-token-aaa-bbb" \
-		--data-binary "@./Cargo.lock" \
-		"http://localhost:8888/upload_file/"
-
-TEST_REQUEST_LOCAL_3:
-	curl \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Filename: file_$(shell date +%Y-%m-%d_%H-%M-%S).txt" \
-		-H "X-Api-Token: test-api-token-aaa-bbb" \
-		--data-binary "@./Cargo.lock" \
-		"http://localhost:8888/upload_file/"
-
-TEST_REQUEST_LOCAL_4:
-	curl \
-		-v \
-		-X POST \
-		-H "Content-Type: text/plain" \
-		-H "X-Api-Token: test-api-token-aaa-bbb" \
-		--data-binary "@./Cargo.lock" \
-		"http://localhost:8888/upload_file/?filename=file_$(shell date +%Y-%m-%d_%H-%M-%S).txt"
-
-TEST_REQUEST_LOCAL_5:
-	curl \
-		-v \
-		-X GET \
-		"http://localhost:8888/prometheus_metrics/"
-
-TEST_REQUEST_LOCAL_6:
-	curl \
-		-v \
-		-X GET \
-		"http://localhost:8888/health/"
-
-
-###########################################################################################
-
 # Подключаем необходимое нам окружение для теста сервера
 # include ./env/prod_test_configs.env
 
@@ -86,6 +35,7 @@ TEST_REQUEST_LOCAL_6:
 # При использовании нативной библиотеки нужно проставлять флаг
 # https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
 # !!!!! Обязательно указываем в конце слеш, иначе прилетает 301 редирект !!!!!
+
 TEST_REQUEST_REMOTE:
 	cd test_app && \
 	cargo run -- --config=../configs/deploy_test/prod.yaml
@@ -93,6 +43,8 @@ TEST_REQUEST_REMOTE:
 TEST_REQUEST_LOCALHOST:
 	cd test_app && \
 	cargo run -- --config=../configs/deploy_test/localhost.yaml
+
+###########################################################################################
 
 # Руками лучше не собрать билды локально, а вместо этого
 # запускать сборку на github через actions

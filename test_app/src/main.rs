@@ -170,7 +170,7 @@ async fn main() {
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
                 .query(&[
                     ("slack_send", "true"),
-                    ("slack_text_prefix", "Custom prefix text from query:"),
+                    ("slack_text_prefix", "Custom prefix text from query: "),
                 ])
                 .body("Custom test data")
                 .send()
