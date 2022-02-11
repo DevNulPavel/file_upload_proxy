@@ -11,7 +11,7 @@ use slack_client_lib::{
     SlackClient,
     SlackThreadImageTarget,
 };
-use tracing::{debug, Instrument};
+use tracing::Instrument;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -67,15 +67,17 @@ impl SlackLinkSender {
     pub async fn post_link(&self, link: &str, text_prefix: Option<String>) -> Result<(), ErrorWithStatusAndDesc> {
         // Формируем текст сообщения
         let text = if let Some(mut text) = text_prefix.or_else(|| self.default_text_before.clone()) {
+            text.push('<');
             text.push_str(link);
+            text.push_str("|link>");
             text
         } else {
-            format!("Download file link: {link}")
+            format!("Download file url: <{link}|link>")
         };
 
         // Футура ожидания сообщений от всех таргетов
         let futures_iter = self.targets.iter().map(|target| {
-            debug!("Send message to target: {} -> {}", text, target);
+            // debug!("Send message to target: {} -> {}", text, target);
             self.client
                 .send_message(&text, SlackChannelMessageTarget::new(target))
                 .in_current_span()
