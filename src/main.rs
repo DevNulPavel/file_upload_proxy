@@ -193,17 +193,16 @@ async fn run_server(port: u16, app: App) -> Result<(), eyre::Error> {
     // Сервис необходим для каждого соединения, поэтому создаем враппер, который будет генерировать наш сервис
     let make_svc = make_service_fn(move |_: &AddrStream| {
         let app = app.clone();
-        let root_span = root_span.clone();
         async move {
             // Создаем сервис из функции с помощью service_fn
             Ok::<_, Infallible>(service_fn(move |req| {
                 let app = app.clone();
-                let root_span = root_span.clone();
 
                 // Обработка запроса, мапим результат в infallible тип
-                process_req(app, req).map(Ok::<_, Infallible>).instrument(root_span)
+                process_req(app, req).map(Ok::<_, Infallible>).in_current_span()
             }))
         }
+        .instrument(root_span.clone())
     });
 
     // Создаем сервер c ожиданием завершения работы
