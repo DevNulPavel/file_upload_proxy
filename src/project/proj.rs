@@ -71,7 +71,7 @@ impl Project {
         // Дублируем ссылку в Slack если нужно
         if let Some(slack) = slack_sender {
             slack.post_link(&download_link, slack_text_prefix).in_current_span().await?;
-        }
+        };
 
         // Формируем ответ
         let json_text = format!(r#"{{"link": "{}", "request_id": "{}"}}"#, download_link, request_id);

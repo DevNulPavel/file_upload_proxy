@@ -14,7 +14,6 @@ use structopt::StructOpt;
 
 const PROJECT_HEADER_KEY: &str = "X-Project-Name";
 const TOKEN_HEADER_KEY: &str = "X-Api-Token";
-const FILENAME_HEADER_KEY: &str = "X-Filename";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -128,13 +127,13 @@ async fn main() {
         // Проверка указания конкретного имени через заголовок
         // Запрос должен вернуть нормальную ссылку
         {
+            let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+            let filename = format!("file_{}_2.txt", time);
+
             let response = request_builder
                 .prepare_with_token(Method::POST, "upload_file/")
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
-                .header(
-                    FILENAME_HEADER_KEY,
-                    format!("file_{}_1.txt", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()),
-                )
+                .query(&[("filename", &filename)])
                 .body("Custom test data")
                 .send()
                 .await
@@ -146,16 +145,32 @@ async fn main() {
             check_valid_response(&text);
         }
 
-        // Проверка указания конкретного имени через заголовок
-        // Запрос должен вернуть нормальную ссылку
         {
-            let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-            let filename = format!("file_{}_2.txt", time);
-
             let response = request_builder
                 .prepare_with_token(Method::POST, "upload_file/")
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
-                .query(&[("filename", &filename)])
+                .query(&[
+                    ("slack_send", "true")
+                ])
+                .body("Custom test data")
+                .send()
+                .await
+                .expect("Request execute failed");
+            assert!(response.status().is_success(), "Simple POST uploading failed");
+
+            let text = response.text().await.expect("Response receiving failed");
+            println!("Response: {}", text);
+            check_valid_response(&text);
+        }
+
+        {
+            let response = request_builder
+                .prepare_with_token(Method::POST, "upload_file/")
+                .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
+                .query(&[
+                    ("slack_send", "true"),
+                    ("slack_text_prefix", "Custom prefix text from query:"),
+                ])
                 .body("Custom test data")
                 .send()
                 .await

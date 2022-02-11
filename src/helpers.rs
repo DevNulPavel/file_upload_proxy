@@ -35,7 +35,7 @@ pub fn get_content_type(headers: &HeaderMap) -> Result<Option<Mime>, eyre::Error
 }
 
 /// Получаем произвольный header и парсим в строку
-pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'a str>, eyre::Error> {
+/*pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'a str>, eyre::Error> {
     let header_val = match headers.get(key) {
         Some(val) => val,
         None => return Ok(None),
@@ -46,7 +46,7 @@ pub fn get_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<Option<&'
         .wrap_err_with(|| format!("Header {} to string convert failed", key))?;
 
     Ok(Some(val))
-}
+}*/
 
 /// Получаем произвольный header и парсим в строку
 pub fn get_required_str_header<'a>(headers: &'a HeaderMap, key: &str) -> Result<&'a str, eyre::Error> {

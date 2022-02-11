@@ -1,6 +1,6 @@
 use crate::{
     error::{ErrorWithStatusAndDesc, WrapErrorWithStatusAndDesc},
-    helpers::{get_content_length, get_content_type, get_required_str_header, get_str_header},
+    helpers::{get_content_length, get_content_type, get_required_str_header},
     types::App,
 };
 use async_compression::tokio::bufread::GzipEncoder;
@@ -55,7 +55,7 @@ fn gzip_body(body: BodyStruct) -> BodyStruct {
     BodyStruct::wrap_stream(out_stream)
 }
 
-fn build_name_and_body(req: Request<BodyStruct>, query_filename: Option<String>) -> Result<(String, BodyStruct), ErrorWithStatusAndDesc> {
+fn build_name_and_body(req: Request<BodyStruct>, input_filename: Option<String>) -> Result<(String, BodyStruct), ErrorWithStatusAndDesc> {
     // Макрос форматирования имени
     macro_rules! format_name {
         ($format: literal) => {
@@ -65,29 +65,6 @@ fn build_name_and_body(req: Request<BodyStruct>, query_filename: Option<String>)
 
     // Получаем body и метаданные отдельно
     let (src_parts, src_body) = req.into_parts();
-
-    // Может быть имя у нас уже передано было в запросе в Header?
-    let input_filename = match get_str_header(&src_parts.headers, "X-Filename")
-        .wrap_err_with_status_desc(StatusCode::BAD_REQUEST, "Filename parsing failed".into())?
-    {
-        // Передаем как есть
-        val @ Some(_) => val.map(|v| v.to_owned()),
-        None => {
-            query_filename
-            // Либо имя у нас передано в query?
-            // match src_parts.uri.query() {
-            //     Some(query_str) => {
-            //         #[derive(Debug, Deserialize)]
-            //         struct Query {
-            //             filename: String,
-            //         }
-
-            //         serde_qs::from_str::<Query>(query_str).ok().map(|v| v.filename)
-            //     }
-            //     None => None,
-            // }
-        }
-    };
 
     // Получаем теперь имя
     let (name, body) = match input_filename {

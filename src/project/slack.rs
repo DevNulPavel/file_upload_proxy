@@ -11,7 +11,6 @@ use slack_client_lib::{
     SlackClient,
     SlackThreadImageTarget,
 };
-use std::borrow::Cow;
 use tracing::{debug, Instrument};
 
 ///////////////////////////////////////////////////////////////////////////
