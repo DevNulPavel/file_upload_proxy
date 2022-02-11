@@ -55,7 +55,7 @@ fn gzip_body(body: BodyStruct) -> BodyStruct {
     BodyStruct::wrap_stream(out_stream)
 }
 
-fn build_name_and_body(req: Request<BodyStruct>) -> Result<(String, BodyStruct), ErrorWithStatusAndDesc> {
+fn build_name_and_body(req: Request<BodyStruct>, query_filename: Option<String>) -> Result<(String, BodyStruct), ErrorWithStatusAndDesc> {
     // Макрос форматирования имени
     macro_rules! format_name {
         ($format: literal) => {
@@ -73,18 +73,19 @@ fn build_name_and_body(req: Request<BodyStruct>) -> Result<(String, BodyStruct),
         // Передаем как есть
         val @ Some(_) => val.map(|v| v.to_owned()),
         None => {
+            query_filename
             // Либо имя у нас передано в query?
-            match src_parts.uri.query() {
-                Some(query_str) => {
-                    #[derive(Debug, Deserialize)]
-                    struct Query {
-                        filename: String,
-                    }
+            // match src_parts.uri.query() {
+            //     Some(query_str) => {
+            //         #[derive(Debug, Deserialize)]
+            //         struct Query {
+            //             filename: String,
+            //         }
 
-                    serde_qs::from_str::<Query>(query_str).ok().map(|v| v.filename)
-                }
-                None => None,
-            }
+            //         serde_qs::from_str::<Query>(query_str).ok().map(|v| v.filename)
+            //     }
+            //     None => None,
+            // }
         }
     };
 
@@ -159,6 +160,18 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
         }
     }
 
+    // Один раз распарсим query строку
+    #[derive(Debug, Deserialize, Default)]
+    struct Query {
+        filename: Option<String>,
+        slack_send: Option<bool>,
+    }
+    let Query{filename, slack_send} = if let Some(query_text) = req.uri().query() {
+        serde_qs::from_str::<Query>(query_text).wrap_err_with_400_desc("Query parsing error".into())?
+    } else {
+        Default::default()
+    };
+
     // Получаем размер данных исходных чисто для логов
     let data_length = get_content_length(req.headers())
         .wrap_err_with_status_desc(StatusCode::LENGTH_REQUIRED, "Content-Length header parsing failed".into())?
@@ -166,8 +179,30 @@ pub async fn file_upload(app: &App, req: Request<BodyStruct>, request_id: &str) 
     debug!("Content-Length: {}", data_length);
 
     // В зависимости от типа контента определяем имя файла конечно и body конечного
-    let (result_file_name, result_body) = build_name_and_body(req)?;
+    let (result_file_name, result_body) = build_name_and_body(req, filename)?;
 
     // Выполняем выгрузку c помощью указанного проекта
     project.upload(result_file_name, result_body, request_id).in_current_span().await
+}
+
+
+#[cfg(test)]
+mod tests{
+    use serde::Deserialize;
+
+    #[test]
+    fn test_query_deserealize(){
+        {
+            #[derive(Debug, Deserialize, Default)]
+            struct Query<'a> {
+                filename: Option<&'a str>,
+                slack_send: Option<bool>,
+            }
+
+            let text = r#"filename=test&slack_send=true"#;
+            let q = serde_qs::from_str::<Query>(text).unwrap();
+            assert_eq!(q.filename.unwrap(), "test");
+            assert!(q.slack_send.unwrap());
+        }
+    }
 }
