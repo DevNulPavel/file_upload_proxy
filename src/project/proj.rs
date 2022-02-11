@@ -69,12 +69,15 @@ impl Project {
         let download_link = self.google_uploader.upload(file_name.as_str(), body).in_current_span().await?;
 
         // Дублируем ссылку в Slack если нужно
-        if let Some(slack) = slack_sender {
+        let slack_sent = if let Some(slack) = slack_sender {
             slack.post_link(&download_link, slack_text_prefix).in_current_span().await?;
+            true
+        }else{
+            false
         };
 
         // Формируем ответ
-        let json_text = format!(r#"{{"link": "{}", "request_id": "{}"}}"#, download_link, request_id);
+        let json_text = format!(r#"{{"link": "{}", "request_id": "{}", "slack_sent": {}}}"#, download_link, request_id, slack_sent);
         let response = Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())

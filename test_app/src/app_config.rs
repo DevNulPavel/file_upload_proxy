@@ -18,8 +18,11 @@ pub struct ProjectConfig {
 /// Конфиг нашего приложения
 #[derive(Deserialize)]
 pub struct Config {
+    // #[serde(deserialize_with = "deserialize_url")]
+    // pub base_url: reqwest::Url,
+
     #[serde(deserialize_with = "deserialize_url")]
-    pub url: reqwest::Url,
+    pub file_upload_url: reqwest::Url,
     pub projects: Vec<ProjectConfig>,
 }
 

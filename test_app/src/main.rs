@@ -33,12 +33,9 @@ impl RequestBuilder {
         }
     }
 
-    fn prepare_with_token(&self, method: Method, path: &str) -> reqwest::RequestBuilder {
-        // Формируем url
-        let url = self.url.join(path).expect("Invalid join path");
-
+    fn prepare_with_token(&self, method: Method) -> reqwest::RequestBuilder {
         self.http_client
-            .request(method, url)
+            .request(method, self.url.clone())
             .header(PROJECT_HEADER_KEY, self.project.clone()) // Добавляем имя проекта
             .header(TOKEN_HEADER_KEY, self.token.clone()) // Добавляем токен
     }
@@ -55,6 +52,7 @@ enum Response {
         link: Url,
         #[allow(dead_code)]
         request_id: String,
+        slack_sent: bool
     },
     Error {
         desc: String,
@@ -64,10 +62,13 @@ enum Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn check_valid_response(text: &str) {
+fn check_valid_response(text: &str, with_slack: bool) {
     match serde_json::from_str::<Response>(text).expect("Simple POST: json parsing error") {
-        Response::Ok { .. } => {
+        Response::Ok { slack_sent, .. } => {
             //println!("Response link: {}, request_id: {}", link, request_id);
+            assert_eq!(slack_sent, with_slack);
+
+            // TODO: Проверить скачиваемость файлика с использованием нужных креденшиалов доступа
         }
         Response::Error { desc, request_id } => {
             panic!("Server error response with desc: {} request_id: {:?}", desc, request_id);
@@ -92,12 +93,12 @@ async fn main() {
 
     // Обходим все указанные проекты в аргументах
     for project in config.projects {
-        let request_builder = RequestBuilder::new(http_client.clone(), config.url.clone(), project.name, project.api_token);
+        let request_builder = RequestBuilder::new(http_client.clone(), config.file_upload_url.clone(), project.name, project.api_token);
 
         // Запрос должен быть с ошибкой
         {
             let response = request_builder
-                .prepare_with_token(Method::GET, "upload_file/")
+                .prepare_with_token(Method::GET)
                 .send()
                 .await
                 .expect("Request execute failed");
@@ -110,7 +111,7 @@ async fn main() {
             let test_data = b"TEST_DATA";
 
             let response = request_builder
-                .prepare_with_token(Method::POST, "upload_file/")
+                .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
                 .body(test_data.as_slice())
                 .send()
@@ -121,7 +122,7 @@ async fn main() {
             let text = response.text().await.expect("Response receiving failed");
             println!("Response: {}", text);
 
-            check_valid_response(&text);
+            check_valid_response(&text, false);
         }
 
         // Проверка указания конкретного имени через заголовок
@@ -131,7 +132,7 @@ async fn main() {
             let filename = format!("file_{}_2.txt", time);
 
             let response = request_builder
-                .prepare_with_token(Method::POST, "upload_file/")
+                .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
                 .query(&[("filename", &filename)])
                 .body("Custom test data")
@@ -142,12 +143,12 @@ async fn main() {
 
             let text = response.text().await.expect("Response receiving failed");
             println!("Response: {}", text);
-            check_valid_response(&text);
+            check_valid_response(&text, false);
         }
 
         {
             let response = request_builder
-                .prepare_with_token(Method::POST, "upload_file/")
+                .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
                 .query(&[
                     ("slack_send", "true")
@@ -160,12 +161,12 @@ async fn main() {
 
             let text = response.text().await.expect("Response receiving failed");
             println!("Response: {}", text);
-            check_valid_response(&text);
+            check_valid_response(&text, true);
         }
 
         {
             let response = request_builder
-                .prepare_with_token(Method::POST, "upload_file/")
+                .prepare_with_token(Method::POST)
                 .header(header::CONTENT_TYPE, mime::TEXT_PLAIN.essence_str())
                 .query(&[
                     ("slack_send", "true"),
@@ -179,7 +180,7 @@ async fn main() {
 
             let text = response.text().await.expect("Response receiving failed");
             println!("Response: {}", text);
-            check_valid_response(&text);
+            check_valid_response(&text, true);
         }
 
         // Проверка статуса приложения (снаружи недоступно)
