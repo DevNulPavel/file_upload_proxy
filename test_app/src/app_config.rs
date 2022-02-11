@@ -1,12 +1,6 @@
-use serde::Deserialize;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-    path::PathBuf,
-};
 use crate::helpers::deserialize_url;
-
-
+use serde::Deserialize;
+use std::{fs::File, io::BufReader, path::PathBuf};
 
 /// Описание для отдельного проекта
 #[derive(Deserialize)]
@@ -19,7 +13,6 @@ pub struct ProjectConfig {
 pub struct Config {
     // #[serde(deserialize_with = "deserialize_url")]
     // pub base_url: reqwest::Url,
-
     #[serde(deserialize_with = "deserialize_url")]
     pub file_upload_url: reqwest::Url,
     pub projects: Vec<ProjectConfig>,
@@ -30,7 +23,6 @@ impl Config {
     pub fn parse_from_file(path: PathBuf) -> Config {
         // Пробуем загрузить конфиг из файлика в зависимости от расширения
         let config: Config = match path.extension().and_then(|v| v.to_str()).map(str::to_lowercase).as_deref() {
-            Some("toml") => toml::from_slice(&fs::read(path).unwrap()).unwrap(),
             Some("yml") | Some("yaml") => {
                 let r = BufReader::new(File::open(path).unwrap());
                 serde_yaml::from_reader(r).unwrap()

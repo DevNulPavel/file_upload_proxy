@@ -76,7 +76,9 @@ impl SlackLinkSender {
         // Футура ожидания сообщений от всех таргетов
         let futures_iter = self.targets.iter().map(|target| {
             debug!("Send message to target: {} -> {}", text, target);
-            self.client.send_message(&text, SlackChannelMessageTarget::new(target))
+            self.client
+                .send_message(&text, SlackChannelMessageTarget::new(target))
+                .in_current_span()
         });
 
         // Делаем запрос выгрузки в каждый таргет сообщения
@@ -89,11 +91,13 @@ impl SlackLinkSender {
             let qr_code_image = create_qr_data(link).wrap_err_with_500_desc("QR code create failed".into())?;
 
             let qr_send_iter = send_results.iter().filter_map(|v| v.as_ref()).map(|message| {
-                self.client.send_image(
-                    qr_code_image.clone(),
-                    None,
-                    SlackThreadImageTarget::new(message.get_channel_id(), message.get_thread_id()),
-                )
+                self.client
+                    .send_image(
+                        qr_code_image.clone(),
+                        None,
+                        SlackThreadImageTarget::new(message.get_channel_id(), message.get_thread_id()),
+                    )
+                    .in_current_span()
             });
 
             futures::future::try_join_all(qr_send_iter).in_current_span().await.map_err(|err| {

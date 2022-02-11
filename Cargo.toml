@@ -38,7 +38,6 @@ tokio-util = {version = "0.6", features = ["io"]}
 serde_qs = "0.8"
 prometheus = "0.13"
 lazy_static = "1.4"
-toml = "0.5"
 serde_yaml = "0.8"
 slack_client_lib = { git = "https://github.com/DevNulPavel/slack_client_lib.git", rev = "d170607a836842e3a0c2a3aeafead9964b03f845", features = ["rustls"] }
 reqwest = {version = "0.11", default-features = false, features = ["json", "multipart", "rustls-tls"]}

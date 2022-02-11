@@ -1,9 +1,5 @@
 use serde::Deserialize;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-    path::PathBuf,
-};
+use std::{fs::File, io::BufReader, path::PathBuf};
 
 /// Настройки для всего приложения
 #[derive(Deserialize, Debug)]
@@ -47,7 +43,6 @@ impl Config {
     pub fn parse_from_file(path: PathBuf) -> Result<Config, eyre::Error> {
         // Пробуем загрузить конфиг из файлика в зависимости от расширения
         let config: Config = match path.extension().and_then(|v| v.to_str()).map(str::to_lowercase).as_deref() {
-            Some("toml") => toml::from_slice(&fs::read(path)?)?,
             Some("yml") | Some("yaml") => {
                 let r = BufReader::new(File::open(path)?);
                 serde_yaml::from_reader(r)?
@@ -129,46 +124,6 @@ mod tests {
         assert_eq!(google_storage_info.bucket_name, "PI2_BUCKET_NAME");
 
         // TODO: Add new tests
-    }
-
-    #[test]
-    fn test_toml_config_parsing() {
-        // TODO: FIX IT
-
-        #[rustfmt::skip]
-        let config: Config = toml::from_str(r#"
-            [settings]
-            port = 8080
-
-            [[projects]]
-            api_token = "TOKEN_VALUE"
-            
-            [[projects]]
-            credentials_file = "/TEST/CREDENTIALS_FILE.json"
-            bucket_name = "PI2_BUCKET_NAME"
-
-            [[projects.slack_link_dub]]
-            token = "asdasd"
-            targets = ["asdasd", "asdads", "asdasd"]
-            qr_code = true
-            default_text_before = "qweqwe"
-
-            [[projects]]
-            api_token = "bffbf"
-
-            [[projects.google_storage_target]]
-            credentials_file = "/asd/asdasasdasdd.json"
-            bucket_name = "asdasd"
-
-            [[projects.slack_link_dub]]
-            token = "sffsdf"
-            targets = ["asdasd", "asdasd"]
-            qr_code = true
-            default_text_before = "sfsdf"   
-        "#)
-        .expect("Toml config parsing failed");
-
-        test_results(config);
     }
 
     #[test]
