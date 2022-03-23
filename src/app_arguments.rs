@@ -25,8 +25,8 @@ impl AppArguments {
             };
         }
 
-        validate_argument!(self.config.exists(), "Google credential file does not exist");
-        validate_argument!(self.config.is_file(), "Google credential file is not a file");
+        validate_argument!(self.config.exists(), "Config file does not exist");
+        validate_argument!(self.config.is_file(), "Config file is not a file");
         Ok(())
     }
 }
