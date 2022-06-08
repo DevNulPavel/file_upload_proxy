@@ -519,7 +519,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber 0.3.3",
  "urlencoding",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1955,18 +1955,18 @@ checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
 
 [[package]]
 name = "slack_client_lib"
-version = "1.2.0"
-source = "git+https://github.com/DevNulPavel/slack_client_lib.git?rev=d170607a836842e3a0c2a3aeafead9964b03f845#d170607a836842e3a0c2a3aeafead9964b03f845"
+version = "2.3.0"
+source = "git+https://github.com/DevNulPavel/slack_client_lib.git?rev=12a0a37af29da391f2b00f4db11865f16b8d6f97#12a0a37af29da391f2b00f4db11865f16b8d6f97"
 dependencies = [
  "async-trait",
  "futures",
+ "log",
  "reqwest",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
- "tracing",
- "uuid",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -2622,6 +2622,15 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
+]
+
+[[package]]
+name = "uuid"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6d5d669b51467dcf7b2f1a796ce0f955f05f01cafda6c19d6e95f730df29238"
 dependencies = [
  "getrandom",
 ]
